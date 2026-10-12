@@ -18,8 +18,8 @@ A page URL's extension picks the view:
 `write_url`. Share `html_url` when people only need to read. Keep `write_url`
 for collaborators: the key in it grants edit and delete.
 
-The public instance is [canvasbin.mckee.family](https://canvasbin.mckee.family).
-This repository is how you run your own.
+Examples below use `https://{your-canvas-bin-host}`. Replace that with the
+origin where you run Canvasbin.
 
 ## Run the Docker Hub image
 
@@ -133,22 +133,21 @@ minutes per client IP). PDF renders are limited too. Behind a proxy, set
 Canvasbin is an MCP server. There is no API key and no login. The write key
 returned by `create_page` is what lets an agent edit or delete that page later.
 
-The public server is `https://canvasbin.mckee.family/mcp`. A server you run
-yourself is the same path on your origin, for example
-`http://localhost:8080/mcp`.
+The MCP endpoint is `https://{your-canvas-bin-host}/mcp`. On your own machine
+that is `http://localhost:8080/mcp`.
 
 Add it for every project on this machine:
 
 ```bash
 claude mcp add --transport http canvasbin --scope user \
-  https://canvasbin.mckee.family/mcp
+  https://{your-canvas-bin-host}/mcp
 ```
 
 Or only the project you are in (the default scope):
 
 ```bash
 claude mcp add --transport http canvasbin \
-  https://canvasbin.mckee.family/mcp
+  https://{your-canvas-bin-host}/mcp
 ```
 
 Check it with `claude mcp list`, then `/mcp` inside a session. Ask Claude to
@@ -169,7 +168,7 @@ To share the server with everyone who clones a repository, commit a
   "mcpServers": {
     "canvasbin": {
       "type": "http",
-      "url": "https://canvasbin.mckee.family/mcp"
+      "url": "https://{your-canvas-bin-host}/mcp"
     }
   }
 }
@@ -189,7 +188,7 @@ project):
 {
   "mcpServers": {
     "canvasbin": {
-      "url": "https://canvasbin.mckee.family/mcp"
+      "url": "https://{your-canvas-bin-host}/mcp"
     }
   }
 }
@@ -198,18 +197,18 @@ project):
 **Codex.**
 
 ```bash
-codex mcp add canvasbin --url https://canvasbin.mckee.family/mcp
+codex mcp add canvasbin --url https://{your-canvas-bin-host}/mcp
 ```
 
 That writes this into `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.canvasbin]
-url = "https://canvasbin.mckee.family/mcp"
+url = "https://{your-canvas-bin-host}/mcp"
 ```
 
 **Claude Desktop.** Add a custom connector and set the URL to
-`https://canvasbin.mckee.family/mcp`. Desktop does not take a remote URL in
+`https://{your-canvas-bin-host}/mcp`. Desktop does not take a remote URL in
 `claude_desktop_config.json`.
 
 **VS Code.** In `.vscode/mcp.json`:
@@ -219,7 +218,7 @@ url = "https://canvasbin.mckee.family/mcp"
   "servers": {
     "canvasbin": {
       "type": "http",
-      "url": "https://canvasbin.mckee.family/mcp"
+      "url": "https://{your-canvas-bin-host}/mcp"
     }
   }
 }
