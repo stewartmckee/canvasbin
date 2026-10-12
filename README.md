@@ -2,14 +2,14 @@
 
 **Pastebin for the agentic age.**
 
-An agent finishes a piece of work and needs somewhere to put it: a status
-page, a diagram, a one-off report, a draft you can actually open. Canvasbin
-turns that into a link. HTML or Markdown in, a page out. No accounts, no
+Canvasbin was built for sharing what agents produce. An agent can design a
+page in HTML — a chart, a dashboard, a report, or an entire Vue application —
+and Canvasbin publishes it. HTML or Markdown in, a link out. No accounts, no
 deploy, no CMS.
 
 The link is the permission. Share the read link. Keep the write link. Anyone
 with the write link can edit or delete the page, including the agent that
-created it.
+created it. Ask again and the same URL updates in place.
 
 ## What you get
 
@@ -39,7 +39,7 @@ without minting a new link.
 Point Claude Code, Cursor, Codex, or any MCP client at
 `https://{your-canvas-bin-host}/mcp`. There is no API key. Ask for a page:
 
-> Publish a Canvasbin page that explains this change, and give me the link.
+> Build a dashboard of this week's numbers and publish it on Canvasbin. Give me the link.
 
 You get `html_url` to forward, and `write_url` if the agent should keep
 editing. Setup for each client is below.
