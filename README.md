@@ -11,6 +11,10 @@ The link is the permission. Share the read link. Keep the write link. Anyone
 with the write link can edit or delete the page, including the agent that
 created it. Ask again and the same URL updates in place.
 
+`create_page` returns the write key to the agent, so that key is in the chat
+history. Share `html_url` from the transcript. The write key stays there so
+the agent can edit the page later; treat the transcript like the editor.
+
 ## What you get
 
 | Link | What a person sees |
@@ -18,7 +22,7 @@ created it. Ask again and the same URL updates in place.
 | `html_url` | The rendered page. This is the one to send. |
 | `pdf_url` | The same page as a PDF. |
 | `read_url` | The app, view-only: preview and source. |
-| `write_url` | The editor. Treat it like a password. |
+| `write_url` | The editor. Returned to the agent, so it is stored in the chat history. |
 
 The address itself picks the view:
 
@@ -41,8 +45,9 @@ Point Claude Code, Cursor, Codex, or any MCP client at
 
 > Build a dashboard of this week's numbers and publish it on Canvasbin. Give me the link.
 
-You get `html_url` to forward, and `write_url` if the agent should keep
-editing. Setup for each client is below.
+You get `html_url` to forward. The agent also receives `write_url` and
+`write_key`, and those stay in the chat history for the next edit. Setup for
+each client is below.
 
 Examples use `https://{your-canvas-bin-host}`. Replace that with the origin
 where you run Canvasbin. On your own machine that is `http://localhost:8080`.
@@ -189,10 +194,10 @@ publish a page. A typical request:
 
 > Create a Canvasbin page that explains this change, and give me the link to share.
 
-`create_page` returns four links. `html_url` is the one to share. Keep
-`write_url` (or `write_key`) in the conversation if Claude should edit the
-page afterwards. A later edit is `update_page` with that write key. You do
-not need to open the browser for the edit.
+`create_page` returns four links, plus the keys. `html_url` is the one to
+share. `write_url` and `write_key` come back to Claude and remain in the
+chat history, which is what lets a later turn call `update_page` without
+opening the browser.
 
 To share the server with everyone who clones a repository, commit a
 `.mcp.json` in that repository:
