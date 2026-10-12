@@ -1,0 +1,52 @@
+name: Bug report
+description: Something does not work as described
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues before filing. Security problems go to
+        Security Advisories, not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Steps, commands, or a minimal page that shows the problem.
+      placeholder: |
+        1. docker compose up
+        2. Open …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Image tag, git commit, or "built from main".
+      placeholder: stewartmckee/canvasbin:latest
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How are you running it
+      options:
+        - Docker Hub image
+        - docker compose up --build
+        - go run / local UI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Browser, OS, logs, or screenshots.

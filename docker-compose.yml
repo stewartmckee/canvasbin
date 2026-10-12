@@ -1,0 +1,43 @@
+# Local development: Postgres + Canvasbin on http://localhost:8080
+#
+#   docker compose up --build
+#
+# For Go/Vite dev loops, start only Postgres (`docker compose up postgres`) and
+# run `make dev`.
+
+name: canvasbin
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: canvasbin
+      POSTGRES_PASSWORD: canvasbin
+      POSTGRES_DB: canvasbin
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canvasbin -d canvasbin"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    image: stewartmckee/canvasbin:dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://canvasbin:canvasbin@postgres:5432/canvasbin?sslmode=disable
+      HTTP_ADDR: ":8080"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata: {}

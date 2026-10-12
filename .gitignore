@@ -1,0 +1,11 @@
+/bin/
+/canvasbin
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+.env
+.DS_Store
+
+# Personal deployment helpers (LAN hosts). Not part of the public project.
+scripts/
+docker-compose.prod.yml
