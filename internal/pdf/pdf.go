@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 	"net/url"
 	"os"
@@ -34,9 +33,10 @@ func New(concurrency int) *Renderer {
 }
 
 // Render loads pageURL in a fresh headless browser and prints it to A4.
-// Only pageURL itself may be fetched from a private address; every other
-// request to loopback, private or link-local networks is blocked so page
-// content cannot reach internal services.
+// Chromium keeps its process sandbox. Subresources are loaded through a local
+// proxy that dials the IP it resolved, so a DNS rebind cannot point the
+// connection at an internal host. 127.0.0.1 skips that proxy so this server
+// can be printed; every loopback URL other than pageURL is still refused.
 func (r *Renderer) Render(ctx context.Context, pageURL string) ([]byte, error) {
 	select {
 	case r.slots <- struct{}{}:
@@ -47,9 +47,19 @@ func (r *Renderer) Render(ctx context.Context, pageURL string) ([]byte, error) {
 		return nil, ctx.Err()
 	}
 
+	proxy, err := startGuardProxy()
+	if err != nil {
+		return nil, fmt.Errorf("render pdf: %w", err)
+	}
+	defer proxy.Close()
+
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.NoSandbox,
 		chromedp.DisableGPU,
+		chromedp.ProxyServer("http://"+proxy.addr),
+		chromedp.Flag("proxy-bypass-list", "127.0.0.1"),
+		chromedp.Flag("disable-quic", true),
+		// Replaces the default disable-features value, so the original entries stay.
+		chromedp.Flag("disable-features", "Translate,BlinkGenPropertyTrees,WebRTC"),
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("hide-scrollbars", true),
 	)
@@ -86,7 +96,7 @@ func (r *Renderer) Render(ctx context.Context, pageURL string) ([]byte, error) {
 		}
 	}()
 
-	err := chromedp.Do(tabCtx,
+	err = chromedp.Do(tabCtx,
 		chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
 			_, err := cdp.Call(ctx, t, fetch.Enable, fetch.EnableParams{})
 			return err
@@ -123,28 +133,17 @@ func allowed(raw string) bool {
 	default:
 		return false
 	}
-	host := u.Hostname()
-	var addrs []netip.Addr
-	if a, err := netip.ParseAddr(host); err == nil {
-		addrs = []netip.Addr{a}
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-		if err != nil || len(ips) == 0 {
-			return false
-		}
-		addrs = ips
+	if u.Hostname() == "" {
+		return false
 	}
-	for _, a := range addrs {
-		a = a.Unmap()
-		if a.IsLoopback() || a.IsPrivate() || a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() ||
-			a.IsUnspecified() || a.IsMulticast() || isCGNAT(a) {
-			return false
-		}
-	}
-	return true
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_, err = hostCheck.publicIPs(ctx, u.Hostname())
+	return err == nil
 }
+
+// hostCheck resolves names for the fetch filter. Connections are pinned by the per-render proxy.
+var hostCheck = newGuardProxy()
 
 var cgnat = netip.MustParsePrefix("100.64.0.0/10")
 

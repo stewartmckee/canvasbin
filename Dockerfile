@@ -24,6 +24,8 @@ FROM alpine:3.22
 RUN apk add --no-cache ca-certificates wget chromium font-noto font-noto-emoji ttf-freefont \
     && adduser -D -H -u 10001 canvasbin
 COPY --from=build /out/canvasbin /usr/local/bin/canvasbin
+# Chromium keeps its sandbox. Docker's default seccomp profile blocks the
+# namespaces that sandbox needs; the compose files set seccomp=unconfined.
 USER canvasbin
 ENV HTTP_ADDR=:8080 \
     CHROME_BIN=/usr/bin/chromium-browser \

@@ -59,6 +59,10 @@ services:
       DATABASE_URL: postgres://canvasbin:${POSTGRES_PASSWORD}@postgres:5432/canvasbin?sslmode=disable
       HTTP_ADDR: ":8080"
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+    # Chromium's sandbox needs namespaces Docker's default seccomp profile blocks.
+    # Without this, PDF export fails instead of running the browser unsandboxed.
+    security_opt:
+      - seccomp:unconfined
 
 volumes:
   pgdata: {}
