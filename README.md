@@ -1,30 +1,58 @@
 # Canvasbin
 
-Canvasbin hosts HTML or Markdown pages at unguessable URLs. There are no
-accounts. Whoever has the write link can edit or delete the page. Whoever has
-the read link can view it.
+**Pastebin for the agentic age.**
 
-A page URL's extension picks the view:
+An agent finishes a piece of work and needs somewhere to put it: a status
+page, a diagram, a one-off report, a draft you can actually open. Canvasbin
+turns that into a link. HTML or Markdown in, a page out. No accounts, no
+deploy, no CMS.
+
+The link is the permission. Share the read link. Keep the write link. Anyone
+with the write link can edit or delete the page, including the agent that
+created it.
+
+## What you get
+
+| Link | What a person sees |
+| --- | --- |
+| `html_url` | The rendered page. This is the one to send. |
+| `pdf_url` | The same page as a PDF. |
+| `read_url` | The app, view-only: preview and source. |
+| `write_url` | The editor. Treat it like a password. |
+
+The address itself picks the view:
 
 | URL | What it is |
 | --- | --- |
 | `/{key}` | The app. A write key opens the editor. A read key is view-only. |
 | `/{key}.html` | The rendered page. HTML scripts run in a sandbox. |
-| `/{key}.pdf` | A PDF download of the rendered page. |
+| `/{key}.pdf` | A PDF download. |
 | `/{key}.md` | Markdown source, for Markdown pages. |
-| `/raw/{key}` | Raw stored source. |
+| `/raw/{key}` | The stored source. |
 
-`create_page` (HTTP or MCP) returns `html_url`, `pdf_url`, `read_url`, and
-`write_url`. Share `html_url` when people only need to read. Keep `write_url`
-for collaborators: the key in it grants edit and delete.
+Pages can be a fragment or a full HTML document. Markdown is rendered for
+you. Updates are live on the same URLs, so an agent can revise a page
+without minting a new link.
 
-Examples below use `https://{your-canvas-bin-host}`. Replace that with the
-origin where you run Canvasbin.
+## Hand it to an agent
 
-## Run the Docker Hub image
+Point Claude Code, Cursor, Codex, or any MCP client at
+`https://{your-canvas-bin-host}/mcp`. There is no API key. Ask for a page:
 
-Image: [`stewartmckee/canvasbin`](https://hub.docker.com/r/stewartmckee/canvasbin)
-(`linux/amd64`). It includes the UI and headless Chromium for PDF export.
+> Publish a Canvasbin page that explains this change, and give me the link.
+
+You get `html_url` to forward, and `write_url` if the agent should keep
+editing. Setup for each client is below.
+
+Examples use `https://{your-canvas-bin-host}`. Replace that with the origin
+where you run Canvasbin. On your own machine that is `http://localhost:8080`.
+
+## Run it
+
+One container, plus Postgres. The image on
+[Docker Hub](https://hub.docker.com/r/stewartmckee/canvasbin) is
+`stewartmckee/canvasbin` (`linux/amd64`). It includes the editor and
+headless Chromium for PDF export.
 
 Save this as `compose.yaml`:
 
@@ -132,13 +160,15 @@ Page content is limited to 1 MiB. Creating pages is rate limited (60 per 10
 minutes per client IP). PDF renders are limited too. Behind a proxy, set
 `X-Forwarded-For` so limits apply to the caller rather than the proxy.
 
-## Use it from Claude Code
+## Connect an agent
 
-Canvasbin is an MCP server. There is no API key and no login. The write key
-returned by `create_page` is what lets an agent edit or delete that page later.
+Canvasbin speaks MCP over Streamable HTTP. No API key, no login. The write
+key from `create_page` is what lets an agent edit or delete that page later.
 
-The MCP endpoint is `https://{your-canvas-bin-host}/mcp`. On your own machine
+The endpoint is `https://{your-canvas-bin-host}/mcp`. On your own machine
 that is `http://localhost:8080/mcp`.
+
+### Claude Code
 
 Add it for every project on this machine:
 
@@ -183,7 +213,7 @@ required. `streamable-http` is accepted as an alias.
 
 ### Other clients
 
-The transport is Streamable HTTP. No headers are required.
+No headers are required.
 
 **Cursor.** In `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one
 project):
