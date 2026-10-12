@@ -128,18 +128,112 @@ Page content is limited to 1 MiB. Creating pages is rate limited (60 per 10
 minutes per client IP). PDF renders are limited too. Behind a proxy, set
 `X-Forwarded-For` so limits apply to the caller rather than the proxy.
 
-## MCP
+## Use it from Claude Code
 
-A Streamable HTTP MCP server is mounted at `/mcp`. Point a client at
-`https://your-host/mcp`. Tools:
+Canvasbin is an MCP server. There is no API key and no login. The write key
+returned by `create_page` is what lets an agent edit or delete that page later.
 
-- `create_page` — publish HTML or Markdown
-- `get_page` — read a page by read key, write key, or URL
-- `update_page` — replace content, title, or format (write key)
-- `delete_page` — delete a page (write key)
+The public server is `https://canvasbin.mckee.family/mcp`. A server you run
+yourself is the same path on your origin, for example
+`http://localhost:8080/mcp`.
+
+Add it for every project on this machine:
+
+```bash
+claude mcp add --transport http canvasbin --scope user \
+  https://canvasbin.mckee.family/mcp
+```
+
+Or only the project you are in (the default scope):
+
+```bash
+claude mcp add --transport http canvasbin \
+  https://canvasbin.mckee.family/mcp
+```
+
+Check it with `claude mcp list`, then `/mcp` inside a session. Ask Claude to
+publish a page. A typical request:
+
+> Create a Canvasbin page that explains this change, and give me the link to share.
+
+`create_page` returns four links. `html_url` is the one to share. Keep
+`write_url` (or `write_key`) in the conversation if Claude should edit the
+page afterwards. A later edit is `update_page` with that write key. You do
+not need to open the browser for the edit.
+
+To share the server with everyone who clones a repository, commit a
+`.mcp.json` in that repository:
+
+```json
+{
+  "mcpServers": {
+    "canvasbin": {
+      "type": "http",
+      "url": "https://canvasbin.mckee.family/mcp"
+    }
+  }
+}
+```
+
+Claude Code asks before it uses a project `.mcp.json`. `"type": "http"` is
+required. `streamable-http` is accepted as an alias.
+
+### Other clients
+
+The transport is Streamable HTTP. No headers are required.
+
+**Cursor.** In `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one
+project):
+
+```json
+{
+  "mcpServers": {
+    "canvasbin": {
+      "url": "https://canvasbin.mckee.family/mcp"
+    }
+  }
+}
+```
+
+**Codex.**
+
+```bash
+codex mcp add canvasbin --url https://canvasbin.mckee.family/mcp
+```
+
+That writes this into `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.canvasbin]
+url = "https://canvasbin.mckee.family/mcp"
+```
+
+**Claude Desktop.** Add a custom connector and set the URL to
+`https://canvasbin.mckee.family/mcp`. Desktop does not take a remote URL in
+`claude_desktop_config.json`.
+
+**VS Code.** In `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "canvasbin": {
+      "type": "http",
+      "url": "https://canvasbin.mckee.family/mcp"
+    }
+  }
+}
+```
+
+### Tools
+
+- `create_page` — publish HTML or Markdown. Returns `html_url`, `pdf_url`, `read_url`, `write_url`, and the keys.
+- `get_page` — read a page by read key, write key, or URL.
+- `update_page` — replace content, title, or format. Needs the write key. Omitted fields stay as they are. `content` replaces the whole page.
+- `delete_page` — delete a page. Needs the write key.
 
 Tools that take a key accept the bare key or any Canvasbin URL. HTML may be a
-fragment or a full document.
+fragment or a full document. Scripts in the rendered page run in a sandbox.
 
 ## Issues
 
