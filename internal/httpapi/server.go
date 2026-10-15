@@ -2,6 +2,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,8 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stewartmckee/canvasbin/internal/billing"
+	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
 	"github.com/stewartmckee/canvasbin/internal/links"
+	"github.com/stewartmckee/canvasbin/internal/mail"
+	"github.com/stewartmckee/canvasbin/internal/oauth"
 	"github.com/stewartmckee/canvasbin/internal/pdf"
 	"github.com/stewartmckee/canvasbin/internal/ratelimit"
 	"github.com/stewartmckee/canvasbin/internal/render"
@@ -33,11 +38,20 @@ type Server struct {
 	CreateLimit   *ratelimit.Limiter
 	Web           fs.FS
 	MCP           http.Handler
-
 	PDF      *pdf.Renderer
 	PDFLimit *ratelimit.Limiter
 	// SelfURL is how the PDF renderer reaches this server, e.g. http://127.0.0.1:8080.
 	SelfURL string
+
+	// Accounts (all optional; only used when Config.Accounts is on).
+	Config    config.Config
+	Mailer    mail.Sender
+	Billing   *billing.Service
+	AuthLimit *ratelimit.Limiter // per client IP, for login/register/reset
+	MailLimit *ratelimit.Limiter // per recipient, to stop mail bombing
+	// OAuth is the MCP authorization server. Handler creates one when accounts
+	// are on and this is nil; main sets it to share it with the MCP gate.
+	OAuth *oauth.Provider
 }
 
 func (s *Server) Handler() http.Handler {
@@ -48,9 +62,21 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/pages/{key}", s.update)
 	mux.HandleFunc("DELETE /api/pages/{key}", s.remove)
 	mux.HandleFunc("POST /api/render", s.preview)
+	mux.HandleFunc("GET /api/config", s.publicConfig)
+	if s.accounts() {
+		s.accountRoutes(mux)
+		if s.OAuth == nil {
+			s.OAuth = s.NewOAuth()
+		}
+		s.OAuth.Routes(mux)
+	}
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})
+	if s.accounts() {
+		mux.HandleFunc("GET /robots.txt", s.robots)
+		mux.HandleFunc("GET /sitemap.xml", s.sitemap)
+	}
 	mux.HandleFunc("GET /raw/{key}", s.raw)
 	mux.HandleFunc("GET /v/{key}", redirectTo(".html"))
 	mux.HandleFunc("GET /e/{key}", redirectTo(""))
@@ -75,11 +101,45 @@ func (s *Server) Handler() http.Handler {
 		case ".pdf":
 			s.pdfDownload(w, r, key)
 		default:
-			s.serveIndex(w)
+			s.serveIndex(w, r)
 		}
 	})
 	mux.Handle("/", spa)
-	return logRequests(commonHeaders(mux))
+	return logRequests(s.commonHeaders(mux))
+}
+
+// marketingPaths are the public site pages search engines may index when
+// accounts are on. Everything else (pages, app screens, API) stays noindex.
+var marketingPaths = []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact"}
+
+func (s *Server) indexable(r *http.Request) bool {
+	if !s.accounts() || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
+		return false
+	}
+	for _, p := range marketingPaths {
+		if r.URL.Path == p {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) robots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, "User-agent: *\nDisallow: /api/\nDisallow: /oauth/\nDisallow: /mcp\nDisallow: /raw/\n\nSitemap: %s/sitemap.xml\n",
+		links.Base(s.PublicBaseURL, r))
+}
+
+func (s *Server) sitemap(w http.ResponseWriter, r *http.Request) {
+	base := links.Base(s.PublicBaseURL, r)
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	for _, p := range marketingPaths {
+		fmt.Fprintf(&b, "  <url><loc>%s%s</loc></url>\n", base, p)
+	}
+	b.WriteString("</urlset>\n")
+	_, _ = w.Write([]byte(b.String()))
 }
 
 // redirectTo keeps the original /v/{key} and /e/{key} links working.
@@ -97,6 +157,8 @@ func redirectTo(suffix string) http.HandlerFunc {
 type pageResponse struct {
 	store.Page
 	CanWrite bool   `json:"can_write"`
+	Role     string `json:"role,omitempty"`
+	Owned    bool   `json:"owned"`
 	ReadKey  string `json:"read_key"`
 	WriteKey string `json:"write_key,omitempty"`
 	links.Links
@@ -106,6 +168,8 @@ func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
 	return pageResponse{
 		Page:     a.Page,
 		CanWrite: a.CanWrite,
+		Role:     a.Role,
+		Owned:    a.OwnerID != nil,
 		ReadKey:  a.ReadKey,
 		WriteKey: a.WriteKey,
 		Links:    links.For(links.Base(s.PublicBaseURL, r), a.ReadKey, a.WriteKey),
@@ -116,6 +180,18 @@ type pageInput struct {
 	Title   *string `json:"title"`
 	Format  *string `json:"format"`
 	Content *string `json:"content"`
+}
+
+// publicConfig tells the web UI which optional features are available.
+func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
+	cfg := map[string]any{
+		"accounts":        s.accounts(),
+		"billing_enabled": s.accounts() && s.Billing != nil && s.Billing.Enabled(),
+	}
+	if s.accounts() {
+		cfg["free_quota"], cfg["pro_quota"] = s.Config.PlanQuotas()
+	}
+	writeJSON(w, http.StatusOK, cfg)
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +211,22 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	a, err := s.Store.Create(r.Context(), deref(in.Title), deref(in.Format), deref(in.Content))
+	var (
+		a   *store.Access
+		err error
+	)
+	if u := s.SessionUser(r); u != nil {
+		if err = s.checkQuota(r, u); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		a, err = s.Store.CreateOwned(r.Context(), u.ID, deref(in.Title), deref(in.Format), deref(in.Content))
+	} else if s.accounts() {
+		writeError(w, http.StatusUnauthorized, "sign in to create pages")
+		return
+	} else {
+		a, err = s.Store.Create(r.Context(), deref(in.Title), deref(in.Format), deref(in.Content))
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -148,7 +239,15 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a, err := s.Store.Get(r.Context(), key)
+	var (
+		a   *store.Access
+		err error
+	)
+	if u := s.SessionUser(r); u != nil {
+		a, err = s.Store.GetForUser(r.Context(), key, u.ID)
+	} else {
+		a, err = s.Store.Get(r.Context(), key)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -165,7 +264,16 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	a, err := s.Store.Update(r.Context(), key, store.Changes{Title: in.Title, Format: in.Format, Content: in.Content})
+	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content}
+	var (
+		a   *store.Access
+		err error
+	)
+	if u := s.SessionUser(r); u != nil {
+		a, err = s.Store.UpdateForUser(r.Context(), key, u.ID, changes)
+	} else {
+		a, err = s.Store.Update(r.Context(), key, changes)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -178,7 +286,13 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.Store.Delete(r.Context(), key); err != nil {
+	var err error
+	if u := s.SessionUser(r); u != nil {
+		err = s.Store.DeleteForUser(r.Context(), key, u.ID)
+	} else {
+		err = s.Store.Delete(r.Context(), key)
+	}
+	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
@@ -332,15 +446,18 @@ func (s *Server) spa() http.Handler {
 				return
 			}
 		}
-		s.serveIndex(w)
+		s.serveIndex(w, r)
 	})
 }
 
-func (s *Server) serveIndex(w http.ResponseWriter) {
+func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 	index, err := fs.ReadFile(s.Web, "index.html")
 	if err != nil {
 		http.Error(w, "web UI not built", http.StatusNotFound)
 		return
+	}
+	if s.indexable(r) {
+		index = bytes.Replace(index, []byte(`content="noindex, nofollow"`), []byte(`content="index, follow"`), 1)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -380,6 +497,18 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusRequestEntityTooLarge, err.Error())
 	case errors.Is(err, store.ErrBadFormat):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, store.ErrUnauthorized):
+		writeError(w, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, store.ErrQuotaExceeded):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error(), "code": "quota_exceeded"})
+	case errors.Is(err, store.ErrUnverified):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error(), "code": "unverified"})
+	case errors.Is(err, store.ErrDisabled):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error(), "code": "disabled"})
+	case errors.Is(err, store.ErrConflict), errors.Is(err, store.ErrEmailTaken):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, store.ErrInvalidToken):
+		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		slog.Error("store", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")
@@ -404,11 +533,13 @@ func deref(s *string) string {
 	return *s
 }
 
-func commonHeaders(next http.Handler) http.Handler {
+func (s *Server) commonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("X-Robots-Tag", "noindex, nofollow")
+		if !s.indexable(r) {
+			h.Set("X-Robots-Tag", "noindex, nofollow")
+		}
 		h.Set("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, r)
 	})

@@ -1,6 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { router } from './router.js'
+import { initAuth } from './auth.js'
 import './style.css'
 
-createApp(App).use(router).mount('#app')
+initAuth().finally(() => {
+  createApp(App).use(router).mount('#app')
+})

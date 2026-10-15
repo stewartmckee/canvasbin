@@ -9,15 +9,19 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
 	"github.com/stewartmckee/canvasbin/internal/links"
+	"github.com/stewartmckee/canvasbin/internal/mail"
 	"github.com/stewartmckee/canvasbin/internal/ratelimit"
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
 
 const instructions = `Canvasbin hosts HTML or Markdown pages at unguessable URLs. There are no accounts.
 
-A page URL's extension picks the view: /{key} opens the Canvasbin app, /{key}.html is the rendered page, /{key}.pdf downloads it as a PDF, and /{key}.md returns Markdown source for Markdown pages. create_page returns:
+` + pageInstructions
+
+const pageInstructions = `A page URL's extension picks the view: /{key} opens the Canvasbin app, /{key}.html is the rendered page, /{key}.pdf downloads it as a PDF, and /{key}.md returns Markdown source for Markdown pages. create_page returns:
 - html_url: the rendered page, view-only. Usually the best link to share.
 - pdf_url: a PDF download of the rendered page.
 - read_url: the app in read-only mode (preview and source).
@@ -30,29 +34,65 @@ type Options struct {
 	PublicBaseURL string
 	CreateLimit   *ratelimit.Limiter
 	Version       string
+
+	// Config carries account settings (quota, ACCOUNTS flag). The zero value
+	// leaves every tool anonymous, exactly as before accounts existed.
+	Config config.Config
+	// UserFromRequest, when set and Config.Accounts is on, resolves the caller
+	// (e.g. from an OAuth bearer token) so tools act as that user. It returns
+	// nil for anonymous callers. The OAuth layer plugs in here.
+	UserFromRequest func(r *http.Request) *store.User
+	// ScopeFromRequest, when set, returns the OAuth scope of the request's bearer
+	// token so the gate can enforce pages:read / pages:write. Nil skips the check.
+	ScopeFromRequest func(r *http.Request) string
+
+	// Mailer and MailLimit send and throttle share invitations (accounts on).
+	Mailer    mail.Sender
+	MailLimit *ratelimit.Limiter
 }
 
 // Handler returns the Streamable HTTP handler mounted at /mcp.
+//
+// With accounts on and UserFromRequest set, an auth gate runs first and every
+// request needs a bearer token (see gate).
 func Handler(o Options) http.Handler {
-	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
-		return newServer(o, links.Base(o.PublicBaseURL, r), links.ClientIP(r))
+	h := http.Handler(mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
+		var u *store.User
+		if o.Config.Accounts && o.UserFromRequest != nil {
+			// The gate already resolved the token for authenticated calls.
+			if cu, ok := r.Context().Value(userCtxKey{}).(*store.User); ok {
+				u = cu
+			} else {
+				u = o.UserFromRequest(r)
+			}
+		}
+		return newServer(o, links.Base(o.PublicBaseURL, r), links.ClientIP(r), u)
 	}, &mcp.StreamableHTTPOptions{
 		Stateless:           true,
 		JSONResponse:        true,
 		MaxRequestBodyBytes: 3 * store.MaxContentBytes,
-	})
+	}))
+	if o.Config.Accounts && o.UserFromRequest != nil {
+		h = o.gate(h)
+	}
+	return h
 }
 
 type tools struct {
 	Options
 	base     string
 	clientIP string
+	user     *store.User // nil for anonymous callers
 }
 
-func newServer(o Options, base, clientIP string) *mcp.Server {
+func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
+	text := instructions
+	if o.Config.Accounts {
+		text = accountInstructions
+	}
 	s := mcp.NewServer(&mcp.Implementation{Name: "canvasbin", Title: "Canvasbin", Version: o.Version},
-		&mcp.ServerOptions{Instructions: instructions})
-	t := &tools{Options: o, base: base, clientIP: clientIP}
+		&mcp.ServerOptions{Instructions: text})
+	t := &tools{Options: o, base: base, clientIP: clientIP, user: user}
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_page",
@@ -77,6 +117,9 @@ func newServer(o Options, base, clientIP string) *mcp.Server {
 		Description: "Permanently delete a page. Requires the write key or write URL. Both links stop working.",
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), IdempotentHint: true},
 	}, t.remove)
+	if o.Config.Accounts {
+		t.addAccountTools(s)
+	}
 	return s
 }
 
@@ -138,7 +181,28 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 	if t.CreateLimit != nil && !t.CreateLimit.Allow(t.clientIP) {
 		return nil, PageResult{}, errors.New("too many pages created, try again shortly")
 	}
-	a, err := t.Store.Create(ctx, in.Title, in.Format, in.Content)
+	var (
+		a   *store.Access
+		err error
+	)
+	if t.Config.Accounts && t.user == nil {
+		return nil, PageResult{}, errors.New("sign in to create pages")
+	}
+	if t.user != nil {
+		if !t.user.Verified() {
+			return nil, PageResult{}, store.ErrUnverified
+		}
+		n, cerr := t.Store.CountOwned(ctx, t.user.ID)
+		if cerr != nil {
+			return nil, PageResult{}, cerr
+		}
+		if n >= t.Config.Quota(t.user) {
+			return nil, PageResult{}, store.ErrQuotaExceeded
+		}
+		a, err = t.Store.CreateOwned(ctx, t.user.ID, in.Title, in.Format, in.Content)
+	} else {
+		a, err = t.Store.Create(ctx, in.Title, in.Format, in.Content)
+	}
 	if err != nil {
 		return nil, PageResult{}, err
 	}
@@ -150,7 +214,12 @@ func (t *tools) get(ctx context.Context, _ *mcp.CallToolRequest, in GetInput) (*
 	if err != nil {
 		return nil, PageResult{}, store.ErrNotFound
 	}
-	a, err := t.Store.Get(ctx, key)
+	var a *store.Access
+	if t.user != nil {
+		a, err = t.Store.GetForUser(ctx, key, t.user.ID)
+	} else {
+		a, err = t.Store.Get(ctx, key)
+	}
 	if err != nil {
 		return nil, PageResult{}, err
 	}
@@ -165,7 +234,13 @@ func (t *tools) update(ctx context.Context, _ *mcp.CallToolRequest, in UpdateInp
 	if in.Content == nil && in.Format == nil && in.Title == nil {
 		return nil, PageResult{}, errors.New("nothing to update: pass content, title or format")
 	}
-	a, err := t.Store.Update(ctx, key, store.Changes{Title: in.Title, Format: in.Format, Content: in.Content})
+	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content}
+	var a *store.Access
+	if t.user != nil {
+		a, err = t.Store.UpdateForUser(ctx, key, t.user.ID, changes)
+	} else {
+		a, err = t.Store.Update(ctx, key, changes)
+	}
 	if err != nil {
 		return nil, PageResult{}, err
 	}
@@ -177,7 +252,12 @@ func (t *tools) remove(ctx context.Context, _ *mcp.CallToolRequest, in DeleteInp
 	if err != nil {
 		return nil, DeleteResult{}, store.ErrNotFound
 	}
-	if err := t.Store.Delete(ctx, key); err != nil {
+	if t.user != nil {
+		err = t.Store.DeleteForUser(ctx, key, t.user.ID)
+	} else {
+		err = t.Store.Delete(ctx, key)
+	}
+	if err != nil {
 		return nil, DeleteResult{}, err
 	}
 	return nil, DeleteResult{Deleted: true}, nil

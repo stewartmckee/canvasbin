@@ -1,10 +1,11 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
-import CopyField from '../components/CopyField.vue'
-import { createPage, editRoute, htmlPath, parseLink } from '../api.js'
-import { forgetPage, recentPages, rememberPage } from '../recent.js'
+import McpConnect from '../components/McpConnect.vue'
+import { createPage, editRoute, getPage, htmlPath, parseLink } from '../api.js'
+import { accountsEnabled, currentUser, loadMe } from '../auth.js'
+import { forgetPage, pruneRecent, recentPages, rememberPage } from '../recent.js'
 import { useLeaveGuard } from '../composables/useLeaveGuard.js'
 
 const router = useRouter()
@@ -16,11 +17,8 @@ const openInput = ref('')
 const openError = ref('')
 
 const blank = { title: '', format: 'html', content: '' }
-const origin = window.location.origin
-const mcpUrl = `${origin}/mcp`
-const mcpConfig = computed(() =>
-  JSON.stringify({ mcpServers: { canvasbin: { url: mcpUrl } } }, null, 2),
-)
+
+if (!accountsEnabled.value) pruneRecent(getPage)
 
 async function create(page) {
   saving.value = true
@@ -28,6 +26,7 @@ async function create(page) {
   try {
     const created = await createPage(page)
     rememberPage(created)
+    if (currentUser.value) loadMe()
     editor.value?.markSaved()
     dirty.value = false
     await router.replace({ ...editRoute(created.write_key), state: { created: true } })
@@ -56,7 +55,11 @@ function formatDate(s) {
 
 <template>
   <div class="home">
-    <section class="intro">
+    <section v-if="accountsEnabled" class="intro">
+      <p><RouterLink to="/">← Pages</RouterLink></p>
+      <h1>New page</h1>
+    </section>
+    <section v-else class="intro">
       <h1>Share an HTML or Markdown page with a link</h1>
       <p>
         No accounts. Every page gets a <strong>read-only link</strong> and an <strong>edit link</strong> — share
@@ -67,7 +70,7 @@ function formatDate(s) {
     <p v-if="error" class="notice error">{{ error }}</p>
     <PageEditor ref="editor" :page="blank" mode="create" :saving="saving" @save="create" @dirty="dirty = $event" />
 
-    <div class="home-grid">
+    <div v-if="!accountsEnabled" class="home-grid">
       <section class="panel">
         <h2>Open a link</h2>
         <form class="open-form" @submit.prevent="openLink">
@@ -96,8 +99,7 @@ function formatDate(s) {
           Add the MCP server to Cursor, Claude Code or any MCP client. Tools:
           <code>create_page</code>, <code>get_page</code>, <code>update_page</code>, <code>delete_page</code>.
         </p>
-        <CopyField label="MCP endpoint" :value="mcpUrl" hint="Streamable HTTP, no auth." />
-        <pre class="snippet">{{ mcpConfig }}</pre>
+        <McpConnect :oauth="false" />
       </section>
     </div>
   </div>

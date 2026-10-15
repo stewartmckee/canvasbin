@@ -6,6 +6,7 @@ const props = defineProps({
   value: { type: String, required: true },
   hint: { type: String, default: '' },
   tone: { type: String, default: 'neutral' },
+  openable: { type: Boolean, default: true },
 })
 
 const copied = ref(false)
@@ -37,7 +38,7 @@ async function copy() {
     <div class="copy-row">
       <input :value="value" readonly :aria-label="label" @focus="$event.target.select()" />
       <button type="button" class="btn" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
-      <a class="btn ghost" :href="value" target="_blank" rel="noopener noreferrer">Open</a>
+      <a v-if="openable" class="btn ghost" :href="value" target="_blank" rel="noopener noreferrer">Open</a>
     </div>
   </div>
 </template>

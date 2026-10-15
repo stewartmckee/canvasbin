@@ -3,7 +3,8 @@ import { onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import SharePanel from '../components/SharePanel.vue'
-import { deletePage, getPage, updatePage } from '../api.js'
+import { claimPage, deletePage, getPage, updatePage } from '../api.js'
+import { accountsEnabled, currentUser, loadMe } from '../auth.js'
 import { forgetPage, rememberPage } from '../recent.js'
 import { useLeaveGuard } from '../composables/useLeaveGuard.js'
 
@@ -38,6 +39,7 @@ onMounted(async () => {
     if (p.can_write) rememberPage(p)
     setTitle(p)
   } catch (e) {
+    if (e.status === 404) forgetPage(props.pageKey)
     error.value = e.status === 404 ? 'This page does not exist or has been deleted.' : e.message
   } finally {
     loading.value = false
@@ -62,6 +64,26 @@ async function save(changes) {
   }
 }
 
+const claiming = ref(false)
+// A signed-out visitor on a read-only link may have been invited to edit it.
+const showSignIn = () => Boolean(accountsEnabled.value && !currentUser.value && page.value && !page.value.can_write)
+const signInRoute = () => ({ name: 'login', query: { next: `/${props.pageKey}` } })
+
+const canClaim = () => Boolean(currentUser.value && page.value?.write_key && !page.value.owned)
+
+async function claim() {
+  claiming.value = true
+  saveError.value = ''
+  try {
+    page.value = await claimPage(props.pageKey)
+    loadMe()
+  } catch (e) {
+    saveError.value = e.message
+  } finally {
+    claiming.value = false
+  }
+}
+
 async function remove() {
   if (!window.confirm('Delete this page permanently? Both the read-only and edit links will stop working.')) return
   try {
@@ -81,10 +103,22 @@ async function remove() {
     <div v-else-if="error" class="panel empty">
       <h1>Page not found</h1>
       <p>{{ error }}</p>
-      <RouterLink to="/" class="btn primary">Create a new page</RouterLink>
+      <RouterLink to="/" class="btn primary">{{ accountsEnabled ? 'Back to home' : 'Create a new page' }}</RouterLink>
     </div>
     <template v-else-if="page">
       <SharePanel :page="page" :fresh="fresh" />
+      <p v-if="showSignIn()" class="notice claim">
+        Shared with you to edit?
+        <RouterLink class="btn small" :to="signInRoute()">Sign in</RouterLink>
+        <span class="muted small">Pages shared by email open with your access after you sign in.</span>
+      </p>
+      <p v-if="canClaim()" class="notice claim">
+        This page isn't in your library yet.
+        <button type="button" class="btn small" :disabled="claiming" @click="claim">
+          {{ claiming ? 'Claiming…' : 'Claim page' }}
+        </button>
+        <span class="muted small">Claiming makes you the owner so you can share it by email.</span>
+      </p>
       <p v-if="saveError" class="notice error">{{ saveError }}</p>
       <PageEditor
         ref="editor"
