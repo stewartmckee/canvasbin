@@ -36,6 +36,16 @@ services:
       DATABASE_URL: postgres://canvasbin:canvasbin@postgres:5432/canvasbin?sslmode=disable
       HTTP_ADDR: ":8080"
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      # Accounts are off unless ACCOUNTS=on (requires MAILGUN_SENDING_KEY).
+      ACCOUNTS: ${ACCOUNTS:-off}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      MAILGUN_SENDING_KEY: ${MAILGUN_SENDING_KEY:-}
+      MAILGUN_DOMAIN: ${MAILGUN_DOMAIN:-canvasbin.dev}
+      MAIL_FROM: ${MAIL_FROM:-Canvasbin <noreply@canvasbin.dev>}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
     ports:
       - "8080:8080"
     # Chromium's sandbox needs namespaces Docker's default seccomp profile blocks.

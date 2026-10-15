@@ -8,3 +8,108 @@ CREATE TABLE IF NOT EXISTS pages (
     created_at     timestamptz NOT NULL DEFAULT now(),
     updated_at     timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE pages ADD COLUMN IF NOT EXISTS owner_id bigint;
+-- Only set for owned pages: lets an owner's library link back to a page. The
+-- read key is a read-only bearer link, so retaining it is a deliberate tradeoff.
+ALTER TABLE pages ADD COLUMN IF NOT EXISTS read_key text;
+
+CREATE TABLE IF NOT EXISTS users (
+    id                     bigserial PRIMARY KEY,
+    email                  text        NOT NULL UNIQUE,
+    password_hash          text        NOT NULL,
+    display_name           text        NOT NULL DEFAULT '',
+    email_verified_at      timestamptz,
+    disabled_at            timestamptz,
+    stripe_customer_id     text UNIQUE,
+    stripe_subscription_id text UNIQUE,
+    stripe_price_id        text,
+    subscription_status    text        NOT NULL DEFAULT '',
+    current_period_end     timestamptz,
+    cancel_at_period_end   boolean     NOT NULL DEFAULT false,
+    created_at             timestamptz NOT NULL DEFAULT now(),
+    updated_at             timestamptz NOT NULL DEFAULT now()
+);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'pages_owner_id_fkey') THEN
+        ALTER TABLE pages
+            ADD CONSTRAINT pages_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS pages_owner_id_idx ON pages (owner_id) WHERE owner_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id         bigserial PRIMARY KEY,
+    user_id    bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash bytea       NOT NULL UNIQUE,
+    expires_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS email_tokens (
+    id         bigserial PRIMARY KEY,
+    user_id    bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose    text        NOT NULL CHECK (purpose IN ('verify', 'reset')),
+    token_hash bytea       NOT NULL UNIQUE,
+    expires_at timestamptz NOT NULL,
+    used_at    timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS page_shares (
+    page_id    bigint      NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    user_id    bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role       text        NOT NULL CHECK (role IN ('viewer', 'editor')),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (page_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS page_invites (
+    id         bigserial PRIMARY KEY,
+    page_id    bigint      NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    email      text        NOT NULL,
+    role       text        NOT NULL CHECK (role IN ('viewer', 'editor')),
+    invited_by bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (page_id, email)
+);
+
+-- OAuth for MCP
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id                  text PRIMARY KEY,
+    client_secret_hash         bytea,
+    redirect_uris              text[]      NOT NULL,
+    client_name                text        NOT NULL DEFAULT '',
+    token_endpoint_auth_method text        NOT NULL DEFAULT 'none',
+    created_at                 timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS oauth_auth_codes (
+    code_hash             bytea PRIMARY KEY,
+    client_id             text        NOT NULL,
+    user_id               bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    redirect_uri          text        NOT NULL,
+    code_challenge        text        NOT NULL,
+    code_challenge_method text        NOT NULL DEFAULT 'S256',
+    scope                 text        NOT NULL,
+    resource              text        NOT NULL,
+    expires_at            timestamptz NOT NULL,
+    used_at               timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id                 bigserial PRIMARY KEY,
+    access_hash        bytea       NOT NULL UNIQUE,
+    refresh_hash       bytea UNIQUE,
+    client_id          text        NOT NULL,
+    user_id            bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scope              text        NOT NULL,
+    resource           text        NOT NULL,
+    access_expires_at  timestamptz NOT NULL,
+    refresh_expires_at timestamptz,
+    revoked_at         timestamptz,
+    created_at         timestamptz NOT NULL DEFAULT now()
+);
