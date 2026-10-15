@@ -31,7 +31,34 @@ export function rememberPage(page) {
   persist()
 }
 
-export function forgetPage(writeKey) {
-  recentPages.value = recentPages.value.filter((p) => p.writeKey !== writeKey)
+// forgetPage drops a page by either of its keys.
+export function forgetPage(key) {
+  recentPages.value = recentPages.value.filter((p) => p.writeKey !== key && p.readKey !== key)
+  persist()
+}
+
+let pruned = false
+
+// pruneRecent drops pages that were deleted elsewhere (another browser, MCP)
+// and refreshes titles. Runs once per app load.
+export async function pruneRecent(fetchPage) {
+  if (pruned) return
+  pruned = true
+  const queue = [...recentPages.value]
+  const worker = async () => {
+    for (let p = queue.shift(); p; p = queue.shift()) {
+      try {
+        const page = await fetchPage(p.writeKey)
+        const entry = recentPages.value.find((e) => e.writeKey === p.writeKey)
+        if (entry && page) {
+          entry.title = page.title || 'Untitled'
+          entry.updatedAt = page.updated_at || entry.updatedAt
+        }
+      } catch (e) {
+        if (e.status === 404) forgetPage(p.writeKey)
+      }
+    }
+  }
+  await Promise.all([worker(), worker(), worker()])
   persist()
 }
