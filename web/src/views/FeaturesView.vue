@@ -34,7 +34,7 @@ const groups = [
     items: [
       ['Your library', 'Every page you own and every page shared with you, in one list.'],
       ['Claim older pages', 'Have an edit link from before you signed up? Claim it into your library.'],
-      ['Plans that grow with you', 'Start free and upgrade to Pro when you need more pages.'],
+      ['Plans that grow with you', 'Start free, upgrade to Individual for more pages, or bring your team for shared pages, comments and a timeline.'],
     ],
   },
   {

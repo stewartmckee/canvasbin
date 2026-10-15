@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import McpConnect from '../components/McpConnect.vue'
 import { listConnections, openBillingPortal, revokeConnection, startCheckout } from '../api.js'
-import { auth, currentUser, isAdmin, logout } from '../auth.js'
+import { auth, currentUser, isAdmin, logout, myTeams } from '../auth.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -75,7 +75,7 @@ onMounted(loadApps)
     <h1>Account</h1>
     <p v-if="route.query.billing === 'success'" class="notice">Thanks! Your plan will update in a moment.</p>
     <p v-if="route.query.upgrade === 'failed'" class="notice error">
-      Your account is ready, but checkout couldn't be opened. Use Upgrade to Pro below to try again.
+      Your account is ready, but checkout couldn't be opened. Use Upgrade to Individual below to try again.
     </p>
     <p v-if="error" class="notice error">{{ error }}</p>
     <div class="home-grid">
@@ -99,7 +99,7 @@ onMounted(loadApps)
         <h2>Plan</h2>
         <dl class="facts">
           <dt>Current plan</dt>
-          <dd>{{ isPro ? 'Pro' : 'Free' }}</dd>
+          <dd>{{ isPro ? 'Individual' : 'Free' }}</dd>
           <dt>Usage</dt>
           <dd>{{ quotaText }}</dd>
           <template v-if="currentUser.subscription_status && currentUser.subscription_status !== 'none'">
@@ -114,7 +114,7 @@ onMounted(loadApps)
         </dl>
         <template v-if="auth.billingEnabled">
           <button v-if="!isPro" type="button" class="btn primary" :disabled="busy" @click="go(startCheckout)">
-            Upgrade to Pro
+            Upgrade to Individual
           </button>
           <button v-else type="button" class="btn" :disabled="busy" @click="go(openBillingPortal)">
             Manage billing
@@ -123,6 +123,24 @@ onMounted(loadApps)
         <p v-else class="muted small">Billing is not enabled on this server.</p>
       </section>
     </div>
+
+    <section class="panel mt">
+      <div class="team-section-head">
+        <h2>Teams</h2>
+        <RouterLink to="/teams/new" class="btn small">Start a team</RouterLink>
+      </div>
+      <p v-if="!myTeams.length" class="muted">
+        A team is a shared space where every member can view, edit and comment on the same pages.
+        <RouterLink to="/pricing">See pricing</RouterLink>.
+      </p>
+      <ul v-else class="recent">
+        <li v-for="t in myTeams" :key="t.id">
+          <RouterLink :to="`/teams/${t.id}`">{{ t.name }}</RouterLink>
+          <span class="badge" :class="t.active ? 'ok' : 'warn'">{{ t.active ? 'Active' : 'Not subscribed' }}</span>
+          <span class="muted small">{{ t.role }} · {{ t.member_count }} members · {{ t.page_count }} pages</span>
+        </li>
+      </ul>
+    </section>
 
     <section class="panel mt">
       <h2>Connected apps</h2>

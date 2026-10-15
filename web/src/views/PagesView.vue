@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import CopyLinkButton from '../components/CopyLinkButton.vue'
 import { editRoute, getLibrary, getPage, htmlPath, parseLink } from '../api.js'
-import { auth, currentUser } from '../auth.js'
+import { auth, currentUser, myTeams } from '../auth.js'
+import { planName } from '../site.js'
 import { forgetPage, pruneRecent, recentPages } from '../recent.js'
 
 const router = useRouter()
@@ -23,7 +24,7 @@ const notice = computed(() => {
     case 'disabled':
       return 'This account has been disabled.'
     case 'success':
-      return 'Thanks for upgrading! Your plan will update in a moment.'
+      return 'Thanks for subscribing! Your plan will update in a moment.'
     case 'cancelled':
       return 'Checkout cancelled — no charge was made.'
     default:
@@ -31,8 +32,11 @@ const notice = computed(() => {
   }
 })
 
-const owned = computed(() => library.value.filter((p) => p.role === 'owner'))
-const shared = computed(() => library.value.filter((p) => p.role !== 'owner'))
+const owned = computed(() => library.value.filter((p) => p.role === 'owner' && !p.team_id))
+const shared = computed(() => library.value.filter((p) => p.role !== 'owner' && !p.team_id))
+const teamSections = computed(() =>
+  myTeams.value.map((t) => ({ team: t, pages: library.value.filter((p) => p.team_id === t.id) })),
+)
 const libraryReadKeys = computed(() => new Set(library.value.map((p) => p.read_key).filter(Boolean)))
 const localPages = computed(() => recentPages.value.filter((p) => !libraryReadKeys.value.has(p.readKey)))
 const verified = computed(() => Boolean(currentUser.value?.email_verified_at))
@@ -78,7 +82,9 @@ function formatDate(s) {
     <section class="intro pages-head">
       <div>
         <h1>Pages</h1>
-        <p v-if="auth.me">{{ auth.me.page_count }} of {{ auth.me.quota }} pages used on the {{ auth.me.plan === 'pro' ? 'Pro' : 'Free' }} plan.</p>
+        <p v-if="auth.me">
+          {{ auth.me.page_count }} of {{ auth.me.quota }} personal pages used on the {{ planName(auth.me.plan) }} plan.
+        </p>
       </div>
       <RouterLink v-if="verified" to="/new" class="btn primary">Create new page</RouterLink>
       <button v-else type="button" class="btn primary" disabled title="Verify your email address to create pages">
@@ -89,7 +95,33 @@ function formatDate(s) {
     <p v-if="notice" class="notice">{{ notice }}</p>
     <p v-if="loadError" class="notice error">{{ loadError }}</p>
 
-    <section class="panel">
+    <section v-for="s in teamSections" :key="s.team.id" class="panel mt">
+      <div class="team-section-head">
+        <h2>
+          <RouterLink :to="`/teams/${s.team.id}`">{{ s.team.name }}</RouterLink>
+          <span class="badge" :class="s.team.active ? 'ok' : 'warn'">{{ s.team.active ? 'Team' : 'Not subscribed' }}</span>
+        </h2>
+        <span class="notice-actions">
+          <span class="muted small">{{ s.team.page_count }} of {{ s.team.quota }} pages</span>
+          <RouterLink v-if="s.team.active && verified" :to="{ path: '/new', query: { team: s.team.id } }" class="btn small">
+            New team page
+          </RouterLink>
+          <RouterLink v-else :to="`/teams/${s.team.id}`" class="btn small">Set up team</RouterLink>
+        </span>
+      </div>
+      <p v-if="loaded && !s.pages.length" class="muted">No team pages yet.</p>
+      <ul v-else class="recent">
+        <li v-for="p in s.pages" :key="p.read_key">
+          <RouterLink :to="editRoute(p.read_key)">{{ p.title || 'Untitled' }}</RouterLink>
+          <a :href="p.html_url" class="small" target="_blank" rel="noopener noreferrer">View</a>
+          <span class="muted small">{{ p.owner_email || 'you' }} · {{ formatDate(p.updated_at) }}</span>
+          <CopyLinkButton :url="p.html_url" />
+        </li>
+      </ul>
+    </section>
+
+    <section class="panel mt">
+      <h2 v-if="teamSections.length">Personal</h2>
       <div v-if="loaded && !owned.length" class="empty-pages">
         <p class="muted">
           You have no pages yet.

@@ -38,9 +38,11 @@ import { site } from '../site.js'
 
     <h2>Plans and billing</h2>
     <p>
-      The Free plan is free. Pro is {{ site.proPrice }} per {{ site.proInterval }}, billed in advance through Stripe and
-      renewing automatically until you cancel. You can cancel any time from your
-      <RouterLink to="/account">account</RouterLink>; Pro continues until the end of the paid period. Payments aren’t
+      The Free plan is free. Individual is {{ site.proPrice }} per {{ site.proInterval }}. Team is
+      {{ site.teamBasePrice }} per {{ site.proInterval }} plus {{ site.teamSeatPrice }} per member, with member changes
+      prorated. Paid plans are billed in advance through Stripe and renew automatically until you cancel. You can
+      cancel any time from your <RouterLink to="/account">account</RouterLink> or team settings; the plan continues
+      until the end of the paid period. Payments aren’t
       refunded for partial periods, except where the law requires. If prices change we’ll tell you in advance.
     </p>
 

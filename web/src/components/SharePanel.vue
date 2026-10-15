@@ -2,7 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import CopyField from './CopyField.vue'
 import { addShare, listShares, removeShare } from '../api.js'
-import { accountsEnabled } from '../auth.js'
+import { RouterLink } from 'vue-router'
+import { accountsEnabled, inActiveTeam } from '../auth.js'
 
 const props = defineProps({
   page: { type: Object, required: true },
@@ -82,7 +83,14 @@ async function remove(addr) {
 
     <div v-if="isOwner" class="people">
       <h3>People</h3>
-      <form class="open-form" @submit.prevent="invite">
+      <p v-if="page.team_name" class="muted small">
+        Everyone in {{ page.team_name }} can already view and edit this page.
+      </p>
+      <p v-if="!inActiveTeam" class="muted small">
+        Sharing with people by email is part of the <RouterLink to="/pricing">Team plan</RouterLink>. Anyone with the
+        read-only link above can view the page.
+      </p>
+      <form v-else class="open-form" @submit.prevent="invite">
         <input v-model="email" type="email" placeholder="Invite by email" aria-label="Email to invite" required />
         <select v-model="role" aria-label="Role">
           <option value="viewer">Viewer</option>
@@ -103,7 +111,7 @@ async function remove(addr) {
           <button type="button" class="link-btn" @click="remove(i.email)">Remove</button>
         </li>
       </ul>
-      <p v-else class="muted small">Not shared with anyone yet.</p>
+      <p v-else-if="inActiveTeam" class="muted small">Not shared with anyone yet.</p>
     </div>
   </section>
 </template>

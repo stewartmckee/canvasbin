@@ -53,6 +53,29 @@ export const revokeConnection = (clientId) => request('POST', '/api/connections/
 export const startCheckout = () => request('POST', '/api/billing/checkout')
 export const openBillingPortal = () => request('POST', '/api/billing/portal')
 
+// Teams
+const teamPath = (id) => `/api/teams/${encodeURIComponent(id)}`
+export const listTeams = () => request('GET', '/api/teams')
+export const createTeam = (name) => request('POST', '/api/teams', { name })
+export const getTeam = (id) => request('GET', teamPath(id))
+export const renameTeam = (id, name) => request('PATCH', teamPath(id), { name })
+export const deleteTeam = (id) => request('DELETE', teamPath(id))
+export const addTeamMember = (id, email, role) => request('POST', `${teamPath(id)}/members`, { email, role })
+export const setTeamMemberRole = (id, userId, role) => request('PATCH', `${teamPath(id)}/members/${userId}`, { role })
+export const removeTeamMember = (id, userId) => request('DELETE', `${teamPath(id)}/members/${userId}`)
+export const cancelTeamInvite = (id, inviteId) => request('DELETE', `${teamPath(id)}/invites/${inviteId}`)
+export const getTeamPages = (id) => request('GET', `${teamPath(id)}/pages`)
+export const getTeamActivity = (id) => request('GET', `${teamPath(id)}/activity`)
+export const startTeamCheckout = (id) => request('POST', `${teamPath(id)}/billing/checkout`)
+export const openTeamBillingPortal = (id) => request('POST', `${teamPath(id)}/billing/portal`)
+
+// Comments and activity on team pages
+const pagePath = (key) => `/api/pages/${encodeURIComponent(key)}`
+export const listComments = (key) => request('GET', `${pagePath(key)}/comments`)
+export const addComment = (key, body) => request('POST', `${pagePath(key)}/comments`, { body })
+export const deleteComment = (key, id) => request('DELETE', `${pagePath(key)}/comments/${id}`)
+export const getPageActivity = (key) => request('GET', `${pagePath(key)}/activity`)
+
 // Admin
 export const listUsers = () => request('GET', '/api/admin/users')
 export const setUserDisabled = (id, disabled) => request('POST', `/api/admin/users/${id}/disable`, { disabled })

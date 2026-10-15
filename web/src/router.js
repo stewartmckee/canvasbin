@@ -9,6 +9,8 @@ import ForgotPasswordView from './views/ForgotPasswordView.vue'
 import ResetPasswordView from './views/ResetPasswordView.vue'
 import AccountView from './views/AccountView.vue'
 import AdminView from './views/AdminView.vue'
+import TeamView from './views/TeamView.vue'
+import TeamNewView from './views/TeamNewView.vue'
 import FeaturesView from './views/FeaturesView.vue'
 import PricingView from './views/PricingView.vue'
 import ContactView from './views/ContactView.vue'
@@ -39,6 +41,14 @@ export const router = createRouter({
     { path: '/forgot-password', name: 'forgot-password', component: ForgotPasswordView, meta: { accounts: true } },
     { path: '/reset-password', name: 'reset-password', component: ResetPasswordView, meta: { accounts: true } },
     { path: '/account', name: 'account', component: AccountView, meta: { accounts: true, auth: true, title: 'Account' } },
+    { path: '/teams/new', name: 'team-new', component: TeamNewView, meta: { accounts: true, auth: true, title: 'Start a team' } },
+    {
+      path: '/teams/:id(\\d+)',
+      name: 'team',
+      component: TeamView,
+      props: (route) => ({ teamId: route.params.id }),
+      meta: { accounts: true, auth: true },
+    },
     { path: '/admin', name: 'admin', component: AdminView, meta: { accounts: true, auth: true, admin: true } },
     {
       path: '/:key([A-Za-z0-9_-]{43})',

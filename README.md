@@ -174,7 +174,9 @@ cd web && npm run build
 | `ADMIN_EMAILS` | empty | Comma-separated emails allowed to use the admin user list. |
 | `STRIPE_SECRET_KEY` | empty | Stripe secret key for Checkout and the Customer Portal. |
 | `STRIPE_WEBHOOK_SECRET` | empty | Signing secret for `POST /api/stripe/webhook`. |
-| `STRIPE_PRICE_PRO` | empty | Recurring Price id for the Pro plan. |
+| `STRIPE_PRICE_PRO` | empty | Recurring Price id for the Individual (internally "pro") plan. |
+| `STRIPE_PRICE_TEAM_BASE` | empty | Recurring flat monthly Price id for a team (£15). |
+| `STRIPE_PRICE_TEAM_SEAT` | empty | Recurring per-member monthly Price id for a team (£4); quantity tracks the member count. |
 | `STRIPE_PUBLISHABLE_KEY` | empty | Optional publishable key for the UI. |
 
 Copy [`.env.example`](.env.example) for a local env file. Never commit real secrets.

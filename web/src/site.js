@@ -5,4 +5,8 @@ export const site = {
   contactEmail: 'support@canvasbin.dev',
   proPrice: '£2.99',
   proInterval: 'month',
+  teamBasePrice: '£15',
+  teamSeatPrice: '£4',
 }
+
+export const planName = (plan) => (plan === 'pro' ? 'Individual' : 'Free')

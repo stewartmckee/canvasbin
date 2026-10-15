@@ -1,15 +1,18 @@
 <script setup>
 import { ref } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import McpConnect from '../components/McpConnect.vue'
 import { createPage, editRoute, getPage, htmlPath, parseLink } from '../api.js'
-import { accountsEnabled, currentUser, loadMe } from '../auth.js'
+import { accountsEnabled, activeTeams, currentUser, loadMe } from '../auth.js'
 import { forgetPage, pruneRecent, recentPages, rememberPage } from '../recent.js'
 import { useLeaveGuard } from '../composables/useLeaveGuard.js'
 
 const router = useRouter()
+const route = useRoute()
 const dirty = useLeaveGuard()
+const requestedTeam = Number(route.query.team) || 0
+const space = ref(activeTeams.value.some((t) => t.id === requestedTeam) ? String(requestedTeam) : '')
 const editor = ref(null)
 const saving = ref(false)
 const error = ref('')
@@ -24,7 +27,7 @@ async function create(page) {
   saving.value = true
   error.value = ''
   try {
-    const created = await createPage(page)
+    const created = await createPage(space.value ? { ...page, team_id: Number(space.value) } : page)
     rememberPage(created)
     if (currentUser.value) loadMe()
     editor.value?.markSaved()
@@ -68,6 +71,13 @@ function formatDate(s) {
     </section>
 
     <p v-if="error" class="notice error">{{ error }}</p>
+    <div v-if="accountsEnabled && activeTeams.length" class="space-picker">
+      <label for="space">Create in</label>
+      <select id="space" v-model="space">
+        <option value="">Personal</option>
+        <option v-for="t in activeTeams" :key="t.id" :value="String(t.id)">{{ t.name }} (team)</option>
+      </select>
+    </div>
     <PageEditor ref="editor" :page="blank" mode="create" :saving="saving" @save="create" @dirty="dirty = $event" />
 
     <div v-if="!accountsEnabled" class="home-grid">

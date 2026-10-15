@@ -3,6 +3,7 @@ import { onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import SharePanel from '../components/SharePanel.vue'
+import TeamPagePanel from '../components/TeamPagePanel.vue'
 import { claimPage, deletePage, getPage, updatePage } from '../api.js'
 import { accountsEnabled, currentUser, loadMe } from '../auth.js'
 import { forgetPage, rememberPage } from '../recent.js'
@@ -13,6 +14,7 @@ const props = defineProps({ pageKey: { type: String, required: true } })
 const router = useRouter()
 const dirty = useLeaveGuard()
 const editor = ref(null)
+const teamPanel = ref(null)
 const page = ref(null)
 const initial = shallowRef(null)
 const loading = ref(true)
@@ -57,6 +59,7 @@ async function save(changes) {
     rememberPage(p)
     fresh.value = false
     setTitle(p)
+    teamPanel.value?.refreshActivity()
   } catch (e) {
     saveError.value = e.message
   } finally {
@@ -117,7 +120,7 @@ async function remove() {
         <button type="button" class="btn small" :disabled="claiming" @click="claim">
           {{ claiming ? 'Claiming…' : 'Claim page' }}
         </button>
-        <span class="muted small">Claiming makes you the owner so you can share it by email.</span>
+        <span class="muted small">Claiming adds it to your library.</span>
       </p>
       <p v-if="saveError" class="notice error">{{ saveError }}</p>
       <PageEditor
@@ -130,6 +133,7 @@ async function remove() {
         @delete="remove"
         @dirty="dirty = $event"
       />
+      <TeamPagePanel v-if="page.team_role" ref="teamPanel" :page="page" />
     </template>
   </div>
 </template>

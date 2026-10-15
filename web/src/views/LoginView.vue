@@ -6,7 +6,7 @@ import { auth, continueAfterSignIn, safeNext } from '../auth.js'
 
 const route = useRoute()
 const router = useRouter()
-const plan = route.query.plan === 'pro' ? 'pro' : ''
+const plan = ['pro', 'team'].includes(route.query.plan) ? route.query.plan : ''
 const email = ref('')
 const password = ref('')
 const busy = ref(false)
@@ -19,7 +19,7 @@ async function submit() {
     auth.me = await login(email.value, password.value)
     if (plan) {
       try {
-        if (await continueAfterSignIn(plan)) return
+        if (await continueAfterSignIn(plan, router)) return
       } catch {
         await router.replace({ path: '/account', query: { upgrade: 'failed' } })
         return
@@ -43,7 +43,8 @@ async function submit() {
 <template>
   <div class="panel auth-card">
     <h1>Sign in</h1>
-    <p v-if="plan" class="notice">Sign in to continue to Pro checkout.</p>
+    <p v-if="plan === 'pro'" class="notice">Sign in to continue to Individual checkout.</p>
+    <p v-else-if="plan === 'team'" class="notice">Sign in to set up your team.</p>
     <p v-if="route.query.reset" class="notice">Password updated. Sign in with your new password.</p>
     <p v-if="error" class="notice error">{{ error }}</p>
     <form class="auth-form" @submit.prevent="submit">
