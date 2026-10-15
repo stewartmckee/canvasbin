@@ -398,6 +398,36 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 		t.Fatalf("revoked token: %d", st)
 	}
 
+	// Disconnecting from the account page signs the app out.
+	code, verifier = f.getCode()
+	st, tok3 := f.token(f.tokenForm(code, verifier))
+	if st != 200 {
+		t.Fatalf("token for disconnect: %d %v", st, tok3)
+	}
+	access3 := tok3["access_token"].(string)
+	conns := user.want(200, "GET", "/api/connections", nil)
+	apps, _ := conns["apps"].([]any)
+	if len(apps) != 1 || apps[0].(map[string]any)["client_name"] != "Test Client" {
+		t.Fatalf("connections: %v", conns)
+	}
+	anon.want(401, "GET", "/api/connections", nil)
+	stranger := e.newClient(t)
+	stranger.signup(uniq("oauth-stranger"))
+	stranger.want(404, "POST", "/api/connections/revoke", map[string]string{"client_id": f.clientID})
+	if st, _, _ := f.mcp(access3, rpcCall("list_pages", `{}`)); st != 200 {
+		t.Fatalf("token before disconnect: %d", st)
+	}
+	user.want(204, "POST", "/api/connections/revoke", map[string]string{"client_id": f.clientID})
+	if st, _, _ := f.mcp(access3, rpcCall("list_pages", `{}`)); st != 401 {
+		t.Fatalf("token after disconnect: %d", st)
+	}
+	if st, out := f.token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok3["refresh_token"].(string)}, "client_id": {f.clientID}}); st != 400 || out["error"] != "invalid_grant" {
+		t.Fatalf("refresh after disconnect: %d %v", st, out)
+	}
+	if out := user.want(200, "GET", "/api/connections", nil); len(out["apps"].([]any)) != 0 {
+		t.Fatalf("connections after disconnect: %v", out)
+	}
+
 	// Metadata-document client ids that point inside the network are refused
 	// without being fetched, and never redirect.
 	for _, id := range []string{"https://127.0.0.1:9/client.json", "https://169.254.169.254/latest/meta-data"} {

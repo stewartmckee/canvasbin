@@ -6,8 +6,9 @@ passwords.
 
 With accounts on (as on canvasbin.dev), people sign in with email and password,
 and MCP clients connect with OAuth 2.1 (PKCE, dynamic client registration).
-Agents get bearer tokens scoped to `pages:read` / `pages:write`. Existing page
-links keep working by key without signing in.
+Agents get bearer tokens scoped to `pages:read` / `pages:write`, which you can
+revoke by disconnecting the app on your account page. Existing page links keep
+working by key without signing in.
 
 ## Reporting a vulnerability
 

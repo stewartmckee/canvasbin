@@ -160,6 +160,54 @@ func (s *Store) RevokeOAuthTokenByHash(ctx context.Context, hash []byte) error {
 	return err
 }
 
+// ConnectedApp is an OAuth client holding at least one live token for a user.
+type ConnectedApp struct {
+	ClientID    string    `json:"client_id"`
+	ClientName  string    `json:"client_name"`
+	Scope       string    `json:"scope"`
+	ConnectedAt time.Time `json:"connected_at"`
+	LastUsedAt  time.Time `json:"last_used_at"`
+}
+
+// ListConnectedApps returns each client with a live token for userID, newest
+// activity first. ClientName is empty for clients that aren't registered rows
+// (URL client IDs).
+func (s *Store) ListConnectedApps(ctx context.Context, userID int64) ([]ConnectedApp, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT t.client_id, COALESCE(MAX(c.client_name), ''), MAX(t.scope), MIN(t.created_at), MAX(t.created_at)
+		 FROM oauth_tokens t
+		 LEFT JOIN oauth_clients c ON c.client_id = t.client_id
+		 WHERE t.user_id = $1 AND t.revoked_at IS NULL
+		   AND (t.access_expires_at > now() OR t.refresh_expires_at IS NULL OR t.refresh_expires_at > now())
+		 GROUP BY t.client_id
+		 ORDER BY MAX(t.created_at) DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	apps := []ConnectedApp{}
+	for rows.Next() {
+		var a ConnectedApp
+		if err := rows.Scan(&a.ClientID, &a.ClientName, &a.Scope, &a.ConnectedAt, &a.LastUsedAt); err != nil {
+			return nil, err
+		}
+		apps = append(apps, a)
+	}
+	return apps, rows.Err()
+}
+
+// RevokeClientTokens revokes every live token clientID holds for userID and
+// reports how many were revoked.
+func (s *Store) RevokeClientTokens(ctx context.Context, userID int64, clientID string) (int64, error) {
+	tag, err := s.db.Exec(ctx,
+		`UPDATE oauth_tokens SET revoked_at = now()
+		 WHERE user_id = $1 AND client_id = $2 AND revoked_at IS NULL`, userID, clientID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // RotateOAuthToken revokes old and stores next in one transaction (refresh grant).
 func (s *Store) RotateOAuthToken(ctx context.Context, oldID int64, next OAuthToken) error {
 	tx, err := s.db.Begin(ctx)

@@ -386,6 +386,22 @@ code {
 .facts dd {
   margin: 0;
 }
+.connected-apps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.connected-apps li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+}
+.connected-apps li:first-child {
+  border-top: 0;
+}
 .table-wrap {
   overflow-x: auto;
 }

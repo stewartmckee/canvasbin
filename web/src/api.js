@@ -45,6 +45,10 @@ export const listShares = (key) => request('GET', sharesPath(key))
 export const addShare = (key, email, role) => request('POST', sharesPath(key), { email, role })
 export const removeShare = (key, email) => request('DELETE', `${sharesPath(key)}/${encodeURIComponent(email)}`)
 
+// Connected apps (MCP clients signed in with OAuth)
+export const listConnections = () => request('GET', '/api/connections')
+export const revokeConnection = (clientId) => request('POST', '/api/connections/revoke', { client_id: clientId })
+
 // Billing
 export const startCheckout = () => request('POST', '/api/billing/checkout')
 export const openBillingPortal = () => request('POST', '/api/billing/portal')

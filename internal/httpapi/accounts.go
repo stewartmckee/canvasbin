@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -92,6 +93,9 @@ func (s *Server) accountRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/pages/{key}/shares", s.listShares)
 	mux.HandleFunc("POST /api/pages/{key}/shares", s.addShare)
 	mux.HandleFunc("DELETE /api/pages/{key}/shares/{email}", s.removeShare)
+
+	mux.HandleFunc("GET /api/connections", s.listConnections)
+	mux.HandleFunc("POST /api/connections/revoke", s.revokeConnection)
 
 	mux.HandleFunc("POST /api/billing/checkout", s.checkout)
 	mux.HandleFunc("POST /api/billing/portal", s.portal)
@@ -580,6 +584,62 @@ func (s *Server) removeShare(w http.ResponseWriter, r *http.Request) {
 	}
 	if !removed {
 		writeError(w, http.StatusNotFound, "no such share")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---- connected apps ----
+
+func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	apps, err := s.Store.ListConnectedApps(r.Context(), u.ID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	for i := range apps {
+		if apps[i].ClientName == "" {
+			apps[i].ClientName = appLabel(apps[i].ClientID)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"apps": apps})
+}
+
+// appLabel names a client without a registered name: the host of a URL
+// client ID, or a generic label.
+func appLabel(clientID string) string {
+	if oauth.IsCIMDClientID(clientID) {
+		if u, err := url.Parse(clientID); err == nil && u.Hostname() != "" {
+			return u.Hostname()
+		}
+	}
+	return "Unnamed app"
+}
+
+// revokeConnection signs an app out by revoking every token it holds for the
+// caller. The client ID is in the body because URL client IDs contain slashes.
+func (s *Server) revokeConnection(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		ClientID string `json:"client_id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	n, err := s.Store.RevokeClientTokens(r.Context(), u.ID, in.ClientID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if n == 0 {
+		writeError(w, http.StatusNotFound, "no such connection")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

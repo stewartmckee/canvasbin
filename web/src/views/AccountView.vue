@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import McpConnect from '../components/McpConnect.vue'
-import { openBillingPortal, startCheckout } from '../api.js'
+import { listConnections, openBillingPortal, revokeConnection, startCheckout } from '../api.js'
 import { auth, currentUser, isAdmin, logout } from '../auth.js'
 
 const route = useRoute()
@@ -38,6 +38,36 @@ async function signOut() {
   await logout()
   router.replace({ name: 'home' })
 }
+
+const apps = ref(null)
+const appsError = ref('')
+const revoking = ref('')
+
+async function loadApps() {
+  try {
+    apps.value = (await listConnections()).apps
+  } catch (e) {
+    appsError.value = e.message
+  }
+}
+
+async function disconnect(app) {
+  if (!window.confirm(`Disconnect ${app.client_name}? It will need to sign in again to use your account.`)) return
+  revoking.value = app.client_id
+  appsError.value = ''
+  try {
+    await revokeConnection(app.client_id)
+    apps.value = apps.value.filter((a) => a.client_id !== app.client_id)
+  } catch (e) {
+    appsError.value = e.message
+  } finally {
+    revoking.value = ''
+  }
+}
+
+const fmtDate = (d) => new Date(d).toLocaleDateString()
+
+onMounted(loadApps)
 </script>
 
 <template>
@@ -93,6 +123,30 @@ async function signOut() {
         <p v-else class="muted small">Billing is not enabled on this server.</p>
       </section>
     </div>
+
+    <section class="panel mt">
+      <h2>Connected apps</h2>
+      <p v-if="appsError" class="notice error">{{ appsError }}</p>
+      <p v-if="apps && !apps.length" class="muted">No assistants are signed in to your account.</p>
+      <ul v-else-if="apps" class="connected-apps">
+        <li v-for="app in apps" :key="app.client_id">
+          <div>
+            <strong>{{ app.client_name }}</strong>
+            <span class="muted small">
+              · connected {{ fmtDate(app.connected_at) }} · last active {{ fmtDate(app.last_used_at) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn small danger"
+            :disabled="revoking === app.client_id"
+            @click="disconnect(app)"
+          >
+            Disconnect
+          </button>
+        </li>
+      </ul>
+    </section>
 
     <section class="panel mt">
       <h2>Connect an AI assistant</h2>

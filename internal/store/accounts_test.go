@@ -323,6 +323,28 @@ func TestOAuthStore(t *testing.T) {
 	if _, err := st.GetOAuthTokenByAccess(ctx, acc2); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("revoked token still valid: %v", err)
 	}
+
+	acc3, ref3 := keys.Hash("acc3-"+cid), keys.Hash("ref3-"+cid)
+	if err := st.CreateOAuthToken(ctx, OAuthToken{AccessHash: acc3, RefreshHash: ref3, ClientID: cid, UserID: u.ID, Scope: "pages", Resource: "r", AccessExpiresAt: time.Now().Add(time.Minute), RefreshExpiresAt: &rexp}); err != nil {
+		t.Fatal(err)
+	}
+	apps, err := st.ListConnectedApps(ctx, u.ID)
+	if err != nil || len(apps) != 1 || apps[0].ClientID != cid || apps[0].ClientName != "t" {
+		t.Fatalf("connected apps: %+v %v", apps, err)
+	}
+	other := newUser(t, st, "oauth-other")
+	if n, err := st.RevokeClientTokens(ctx, other.ID, cid); err != nil || n != 0 {
+		t.Fatalf("revoke for another user: %d %v", n, err)
+	}
+	if n, err := st.RevokeClientTokens(ctx, u.ID, cid); err != nil || n != 1 {
+		t.Fatalf("revoke client: %d %v", n, err)
+	}
+	if _, err := st.GetOAuthTokenByRefresh(ctx, ref3); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("disconnected refresh token still valid: %v", err)
+	}
+	if apps, _ := st.ListConnectedApps(ctx, u.ID); len(apps) != 0 {
+		t.Fatalf("apps after revoke: %+v", apps)
+	}
 }
 
 func ptr[T any](v T) *T { return &v }

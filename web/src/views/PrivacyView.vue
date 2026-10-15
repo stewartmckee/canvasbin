@@ -21,7 +21,7 @@ import { site } from '../site.js'
       </li>
       <li>
         <strong>Connected apps:</strong> if you connect an AI assistant, we store the app’s name and the access you
-        granted it.
+        granted it. You can disconnect an app at any time from your account page.
       </li>
       <li><strong>Technical logs:</strong> request logs used to keep the service running and secure. Page links are removed from logs.</li>
     </ul>
