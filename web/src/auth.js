@@ -6,7 +6,7 @@ export const auth = reactive({
   ready: false,
   accounts: false,
   billingEnabled: false,
-  freeQuota: 20,
+  freeQuota: 5,
   proQuota: 1000,
   me: null,
 })

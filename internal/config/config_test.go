@@ -13,7 +13,7 @@ func TestLoadDefaults(t *testing.T) {
 	if c.Accounts || c.MailgunDomain != "canvasbin.dev" || c.MailFrom != "Canvasbin <noreply@canvasbin.dev>" {
 		t.Fatalf("bad defaults: %+v", c)
 	}
-	if c.FreeQuota != 20 || c.ProQuota != 1000 {
+	if c.FreeQuota != 5 || c.ProQuota != 1000 {
 		t.Fatalf("bad quotas: %+v", c)
 	}
 	if err := c.Validate(); err != nil {
@@ -41,7 +41,7 @@ func TestLoadAccounts(t *testing.T) {
 
 func TestQuota(t *testing.T) {
 	c := fromGetenv(env(nil))
-	cases := map[string]int{"": 20, "canceled": 20, "incomplete": 20, "unpaid": 20, "trialing": 1000, "active": 1000, "past_due": 1000}
+	cases := map[string]int{"": 5, "canceled": 5, "incomplete": 5, "unpaid": 5, "trialing": 1000, "active": 1000, "past_due": 1000}
 	for status, want := range cases {
 		u := &store.User{SubscriptionStatus: status}
 		if got := c.Quota(u); got != want {

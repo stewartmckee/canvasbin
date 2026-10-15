@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	FreeQuota = 20
+	FreeQuota = 5
 	ProQuota  = 1000
 
 	DefaultMailgunDomain = "canvasbin.dev"
