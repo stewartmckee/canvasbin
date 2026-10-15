@@ -160,18 +160,62 @@ cd web && npm run build
 | `HTTP_ADDR` | `:8080` | Listen address. |
 | `PUBLIC_BASE_URL` | request host | Origin used in returned links. |
 | `CHROME_BIN` | Chrome/Chromium on `PATH` | Browser used to print PDFs. |
+| `ACCOUNTS` | off | Set to `on` for email signup, library, sharing, billing, and MCP OAuth. |
+| `MAILGUN_SENDING_KEY` | empty | Required when `ACCOUNTS=on`. Mailgun EU sending API key. |
+| `MAILGUN_DOMAIN` | `canvasbin.dev` | Mailgun sending domain. |
+| `MAIL_FROM` | `Canvasbin <noreply@canvasbin.dev>` | From address for verification and reset mail. |
+| `ADMIN_EMAILS` | empty | Comma-separated emails allowed to use the admin user list. |
+| `STRIPE_SECRET_KEY` | empty | Stripe secret key for Checkout and the Customer Portal. |
+| `STRIPE_WEBHOOK_SECRET` | empty | Signing secret for `POST /api/stripe/webhook`. |
+| `STRIPE_PRICE_PRO` | empty | Recurring Price id for the Pro plan. |
+| `STRIPE_PUBLISHABLE_KEY` | empty | Optional publishable key for the UI. |
+
+Copy [`.env.example`](.env.example) for a local env file. Never commit real secrets.
 
 Page content is limited to 1 MiB. Creating pages is rate limited (60 per 10
 minutes per client IP). PDF renders are limited too. Behind a proxy, set
 `X-Forwarded-For` so limits apply to the caller rather than the proxy.
 
+### Accounts (optional)
+
+With `ACCOUNTS=off` (the default), Canvasbin stays authless: create a page, share
+the read link, keep the write link.
+
+With `ACCOUNTS=on`, people can register with email and password. Mailgun sends
+the verification link. Signed-in users get a library, can claim a write-key page,
+invite collaborators, and (when Stripe is configured) upgrade to Pro via Checkout
+and manage billing in the Stripe Customer Portal. Free accounts may own 20 pages;
+Pro may own 1000. Creating a page requires signing in; existing pages keep
+working by their read and write links without an account.
+
 ## Connect an agent
 
-Canvasbin speaks MCP over Streamable HTTP. No API key, no login. The write
-key from `create_page` is what lets an agent edit or delete that page later.
+Canvasbin speaks MCP over Streamable HTTP. The write key from `create_page` is
+what lets an agent edit or delete that page later.
 
 The endpoint is `https://{your-canvas-bin-host}/mcp`. On your own machine
-that is `http://localhost:8080/mcp`.
+that is `http://localhost:8080/mcp`. With accounts off, no API key or login is
+required. With accounts on, every MCP request needs a signed-in account
+(OAuth), so clients prompt for sign-in when they connect. Page links in the
+browser keep working by key without signing in.
+
+### Sign in from Claude, ChatGPT or Cursor
+
+Point the connector at `https://canvasbin.dev/mcp` (or your hosted origin).
+The first request returns HTTP 401 with a `WWW-Authenticate` challenge.
+The client opens Canvasbin’s OAuth consent screen; after you approve, it
+retries with a bearer token. Discovery documents live at
+`/.well-known/oauth-protected-resource/mcp` and
+`/.well-known/oauth-authorization-server`.
+
+### Cursor plugin
+
+This repository is also a Cursor plugin (`.cursor-plugin/plugin.json`). It
+connects Cursor to `https://canvasbin.dev/mcp` and adds a `canvasbin` skill
+that tells the agent when to publish a page and which link to hand back.
+Install it from the Cursor Marketplace, then ask the agent to publish
+something; Cursor opens the Canvasbin sign-in the first time. To use your own
+host instead, configure the server by hand as shown under Other clients.
 
 ### Claude Code
 
