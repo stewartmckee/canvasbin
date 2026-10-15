@@ -192,7 +192,7 @@ With `ACCOUNTS=on`, people can register with email and password. Mailgun sends
 the verification link. Signed-in users get a library, can claim a write-key page,
 invite collaborators, and (when Stripe is configured) upgrade to Pro via Checkout
 and manage billing in the Stripe Customer Portal. Free accounts may own 5 pages;
-Pro may own 1000. Creating a page requires signing in; existing pages keep
+Pro may own 100. Creating a page requires signing in; existing pages keep
 working by their read and write links without an account.
 
 ## Connect an agent

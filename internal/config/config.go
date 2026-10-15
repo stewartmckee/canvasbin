@@ -12,7 +12,7 @@ import (
 
 const (
 	FreeQuota = 5
-	ProQuota  = 1000
+	ProQuota  = 100
 
 	DefaultMailgunDomain = "canvasbin.dev"
 	DefaultMailFrom      = "Canvasbin <noreply@canvasbin.dev>"
