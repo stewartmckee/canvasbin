@@ -1,7 +1,13 @@
 # Security
 
-Canvasbin pages are unguessable links, not accounts. A write key is the only
-secret that can change or delete a page. Treat write URLs like passwords.
+Canvasbin pages are unguessable links. A read key lets anyone view a page; a
+write key is the secret that can change or delete it. Treat write URLs like
+passwords.
+
+With accounts on (as on canvasbin.dev), people sign in with email and password,
+and MCP clients connect with OAuth 2.1 (PKCE, dynamic client registration).
+Agents get bearer tokens scoped to `pages:read` / `pages:write`. Existing page
+links keep working by key without signing in.
 
 ## Reporting a vulnerability
 

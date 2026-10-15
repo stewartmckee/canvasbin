@@ -4,8 +4,12 @@
 
 Canvasbin was built for sharing what agents produce. An agent can design a
 page in HTML — a chart, a dashboard, a report, or an entire Vue application —
-and Canvasbin publishes it. HTML or Markdown in, a link out. No accounts, no
-deploy, no CMS.
+and Canvasbin publishes it. HTML or Markdown in, a link out. No deploy, no
+CMS. Agents publish; humans share.
+
+Use the hosted service at [canvasbin.dev](https://canvasbin.dev), where you
+sign in once and your pages live in a library you can share, or run your own
+copy with accounts off and no sign-in at all.
 
 The link is the permission. Share the read link. Keep the write link. Anyone
 with the write link can edit or delete the page, including the agent that
@@ -41,7 +45,10 @@ without minting a new link.
 ## Hand it to an agent
 
 Point Claude Code, Cursor, Codex, or any MCP client at
-`https://{your-canvas-bin-host}/mcp`. There is no API key. Ask for a page:
+`https://{your-canvas-bin-host}/mcp`. There is no API key: a self-hosted copy
+with accounts off needs no sign-in, and canvasbin.dev asks you to sign in once
+through the client. In Cursor, install the Canvasbin plugin instead. Ask for a
+page:
 
 > Build a dashboard of this week's numbers and publish it on Canvasbin. Give me the link.
 
