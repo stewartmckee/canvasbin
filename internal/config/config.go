@@ -13,6 +13,7 @@ import (
 const (
 	FreeQuota = 5
 	ProQuota  = 100
+	TeamQuota = 1000
 
 	DefaultMailgunDomain = "canvasbin.dev"
 	DefaultMailFrom      = "Canvasbin <noreply@canvasbin.dev>"
@@ -29,12 +30,15 @@ type Config struct {
 	StripeSecretKey      string
 	StripeWebhookSecret  string
 	StripePricePro       string
+	StripePriceTeamBase  string // flat monthly team price
+	StripePriceTeamSeat  string // per-member monthly price
 	StripePublishableKey string
 
 	AdminEmails []string
 
 	FreeQuota int
 	ProQuota  int
+	TeamQuota int
 }
 
 // Load reads configuration from the process environment.
@@ -58,9 +62,12 @@ func fromGetenv(get func(string) string) Config {
 		StripeSecretKey:      strings.TrimSpace(get("STRIPE_SECRET_KEY")),
 		StripeWebhookSecret:  strings.TrimSpace(get("STRIPE_WEBHOOK_SECRET")),
 		StripePricePro:       strings.TrimSpace(get("STRIPE_PRICE_PRO")),
+		StripePriceTeamBase:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_BASE")),
+		StripePriceTeamSeat:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_SEAT")),
 		StripePublishableKey: strings.TrimSpace(get("STRIPE_PUBLISHABLE_KEY")),
 		FreeQuota:            FreeQuota,
 		ProQuota:             ProQuota,
+		TeamQuota:            TeamQuota,
 	}
 	for _, e := range strings.Split(get("ADMIN_EMAILS"), ",") {
 		if e = store.NormalizeEmail(e); e != "" {
@@ -89,6 +96,19 @@ func (c Config) Validate() error {
 // BillingEnabled is true when Stripe checkout can be offered.
 func (c Config) BillingEnabled() bool {
 	return c.StripeSecretKey != "" && c.StripePricePro != ""
+}
+
+// TeamBillingEnabled is true when team subscriptions can be sold.
+func (c Config) TeamBillingEnabled() bool {
+	return c.StripeSecretKey != "" && c.StripePriceTeamBase != "" && c.StripePriceTeamSeat != ""
+}
+
+// TeamPageQuota is the number of pages an active team may hold.
+func (c Config) TeamPageQuota() int {
+	if c.TeamQuota == 0 {
+		return TeamQuota
+	}
+	return c.TeamQuota
 }
 
 // IsAdmin reports whether email is listed in ADMIN_EMAILS.

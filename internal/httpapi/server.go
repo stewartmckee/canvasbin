@@ -161,11 +161,15 @@ type pageResponse struct {
 	Owned    bool   `json:"owned"`
 	ReadKey  string `json:"read_key"`
 	WriteKey string `json:"write_key,omitempty"`
+	// Team details are only shown to members of the page's team.
+	TeamID   *int64 `json:"team_id,omitempty"`
+	TeamName string `json:"team_name,omitempty"`
+	TeamRole string `json:"team_role,omitempty"`
 	links.Links
 }
 
 func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
-	return pageResponse{
+	out := pageResponse{
 		Page:     a.Page,
 		CanWrite: a.CanWrite,
 		Role:     a.Role,
@@ -174,12 +178,17 @@ func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
 		WriteKey: a.WriteKey,
 		Links:    links.For(links.Base(s.PublicBaseURL, r), a.ReadKey, a.WriteKey),
 	}
+	if a.TeamRole != "" {
+		out.TeamID, out.TeamName, out.TeamRole = a.TeamID, a.TeamName, a.TeamRole
+	}
+	return out
 }
 
 type pageInput struct {
 	Title   *string `json:"title"`
 	Format  *string `json:"format"`
 	Content *string `json:"content"`
+	TeamID  *int64  `json:"team_id"`
 }
 
 // publicConfig tells the web UI which optional features are available.
@@ -190,6 +199,8 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.accounts() {
 		cfg["free_quota"], cfg["pro_quota"] = s.Config.PlanQuotas()
+		cfg["team_quota"] = s.Config.TeamPageQuota()
+		cfg["team_billing_enabled"] = s.Billing != nil && s.Billing.TeamEnabled()
 	}
 	writeJSON(w, http.StatusOK, cfg)
 }
@@ -215,7 +226,17 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		a   *store.Access
 		err error
 	)
-	if u := s.SessionUser(r); u != nil {
+	if u := s.SessionUser(r); u != nil && in.TeamID != nil {
+		if err = s.checkTeamCreate(r, u, *in.TeamID); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		a, err = s.Store.CreateInTeam(r.Context(), u.ID, *in.TeamID, deref(in.Title), deref(in.Format), deref(in.Content))
+		if err == nil {
+			a, err = s.Store.GetForUser(r.Context(), a.WriteKey, u.ID)
+			s.logPage(r, u, a, store.ActivityPageCreated)
+		}
+	} else if u != nil {
 		if err = s.checkQuota(r, u); err != nil {
 			writeStoreError(w, err)
 			return
@@ -271,6 +292,9 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 	)
 	if u := s.SessionUser(r); u != nil {
 		a, err = s.Store.UpdateForUser(r.Context(), key, u.ID, changes)
+		if err == nil {
+			s.logPage(r, u, a, store.ActivityPageEdited)
+		}
 	} else {
 		a, err = s.Store.Update(r.Context(), key, changes)
 	}
@@ -288,7 +312,11 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	if u := s.SessionUser(r); u != nil {
-		err = s.Store.DeleteForUser(r.Context(), key, u.ID)
+		var a *store.Access
+		a, err = s.Store.DeleteForUser(r.Context(), key, u.ID)
+		if err == nil {
+			s.logPage(r, u, a, store.ActivityPageDeleted)
+		}
 	} else {
 		err = s.Store.Delete(r.Context(), key)
 	}
@@ -507,8 +535,13 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error(), "code": "disabled"})
 	case errors.Is(err, store.ErrConflict), errors.Is(err, store.ErrEmailTaken):
 		writeError(w, http.StatusConflict, err.Error())
-	case errors.Is(err, store.ErrInvalidToken):
+	case errors.Is(err, store.ErrInvalidToken), errors.Is(err, store.ErrBadTeamName),
+		errors.Is(err, store.ErrBadTeamRole), errors.Is(err, store.ErrBadComment):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, store.ErrTeamInactive):
+		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": err.Error(), "code": "team_inactive"})
+	case errors.Is(err, store.ErrTeamOwner):
+		writeError(w, http.StatusConflict, err.Error())
 	default:
 		slog.Error("store", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error")

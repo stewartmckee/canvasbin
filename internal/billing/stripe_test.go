@@ -88,3 +88,14 @@ func TestWebhookUpdatesSubscription(t *testing.T) {
 		t.Fatalf("still pro after cancel: %+v", got)
 	}
 }
+
+func TestTeamRef(t *testing.T) {
+	if id, ok := teamRef("team_42"); !ok || id != 42 {
+		t.Fatalf("team_42: %d %v", id, ok)
+	}
+	for _, ref := range []string{"42", "", "team_", "team_x", "team_-1"} {
+		if _, ok := teamRef(ref); ok {
+			t.Fatalf("%q should not be a team ref", ref)
+		}
+	}
+}

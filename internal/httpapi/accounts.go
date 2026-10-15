@@ -101,6 +101,8 @@ func (s *Server) accountRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/billing/portal", s.portal)
 	mux.HandleFunc("POST /api/stripe/webhook", s.stripeWebhook)
 
+	s.teamRoutes(mux)
+
 	mux.HandleFunc("GET /api/admin/users", s.adminUsers)
 	mux.HandleFunc("POST /api/admin/users/{id}/disable", s.adminDisable)
 }
@@ -359,6 +361,14 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.Store.AcceptInvites(ctx, uid, u.Email); err != nil {
 		slog.Error("accept invites", "err", err)
 	}
+	joined, err := s.Store.AcceptTeamInvites(ctx, uid, u.Email)
+	if err != nil {
+		slog.Error("accept team invites", "err", err)
+	}
+	for _, teamID := range joined {
+		s.logActivity(r, store.ActivityEntry{TeamID: teamID, UserID: uid, Action: store.ActivityMemberJoined})
+		s.syncSeats(r, teamID)
+	}
 	if u.Disabled() {
 		http.Redirect(w, r, "/?verify=disabled", http.StatusSeeOther)
 		return
@@ -378,11 +388,18 @@ type meResponse struct {
 	Quota                int         `json:"quota"`
 	PageCount            int         `json:"page_count"`
 	BillingEnabled       bool        `json:"billing_enabled"`
+	TeamBillingEnabled   bool        `json:"team_billing_enabled"`
 	StripePublishableKey string      `json:"stripe_publishable_key,omitempty"`
+	Teams                []teamView  `json:"teams"`
 }
 
 func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, status int, u *store.User) {
 	n, err := s.Store.CountOwned(r.Context(), u.ID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	teams, err := s.Store.ListTeams(r.Context(), u.ID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -398,7 +415,9 @@ func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, status int, u *
 		Quota:                s.Config.Quota(u),
 		PageCount:            n,
 		BillingEnabled:       s.Billing != nil && s.Billing.Enabled(),
+		TeamBillingEnabled:   s.Billing != nil && s.Billing.TeamEnabled(),
 		StripePublishableKey: s.Config.StripePublishableKey,
+		Teams:                s.teamViews(teams),
 	})
 }
 
@@ -552,6 +571,15 @@ func (s *Server) addShare(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.Role != store.RoleViewer && in.Role != store.RoleEditor {
 		writeError(w, http.StatusBadRequest, `role must be "viewer" or "editor"`)
+		return
+	}
+	if inTeam, err := s.Store.InAnyActiveTeam(r.Context(), u.ID); err != nil {
+		writeStoreError(w, err)
+		return
+	} else if !inTeam {
+		writeJSON(w, http.StatusPaymentRequired, map[string]string{
+			"error": "sharing with people by email is part of the Team plan; share the page link instead",
+			"code":  "team_required"})
 		return
 	}
 	if !s.allowMail(w, "share:"+u.Email) {

@@ -41,6 +41,10 @@ func (f *fakeMailer) SendInvite(_ context.Context, e, l, _ string) error {
 	return f.put("invite", e, l)
 }
 
+func (f *fakeMailer) SendTeamInvite(_ context.Context, e, l, _, _ string) error {
+	return f.put("team", e, l)
+}
+
 type env struct {
 	srv  *httptest.Server
 	mail *fakeMailer
@@ -152,6 +156,27 @@ func (c *client) signup(email string) {
 
 func uniq(p string) string { return fmt.Sprintf("%s-%d@example.com", p, time.Now().UnixNano()) }
 
+// activeTeam creates a team owned by email with a paid-up subscription, as the
+// Stripe webhook would leave it.
+func (e *env) activeTeam(t *testing.T, email, name string) int64 {
+	t.Helper()
+	ctx := context.Background()
+	u, err := e.st.GetUserByEmail(ctx, email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tm, err := e.st.CreateTeam(ctx, u.ID, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.UpdateTeamSubscription(ctx, tm.ID, store.Subscription{
+		SubscriptionID: fmt.Sprintf("sub_test_%d", time.Now().UnixNano()), Status: "active",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return tm.ID
+}
+
 func TestAccountsLifecycle(t *testing.T) {
 	e := newEnv(t, true, 2)
 	c := e.newClient(t)
@@ -235,6 +260,11 @@ func TestOwnedPagesQuotaAndSharing(t *testing.T) {
 	friend.want(403, "GET", "/api/pages/"+readKey+"/shares", nil)
 	anon.want(401, "GET", "/api/pages/"+readKey+"/shares", nil)
 	owner.want(400, "POST", "/api/pages/"+readKey+"/shares", map[string]string{"email": friendEmail, "role": "admin"})
+	// Email sharing is a Team plan feature.
+	if out := owner.want(402, "POST", "/api/pages/"+readKey+"/shares", map[string]string{"email": friendEmail, "role": "viewer"}); out["code"] != "team_required" {
+		t.Fatalf("want team_required: %v", out)
+	}
+	e.activeTeam(t, ownerEmail, "Sharers")
 	owner.want(200, "POST", "/api/pages/"+readKey+"/shares", map[string]string{"email": friendEmail, "role": "viewer"})
 	friend.want(403, "PUT", "/api/pages/"+readKey, map[string]string{"content": "nope"})
 	lst := owner.want(200, "POST", "/api/pages/"+readKey+"/shares", map[string]string{"email": friendEmail, "role": "editor"})

@@ -19,39 +19,44 @@ type PageSummary struct {
 	Role       string    `json:"role"` // owner, editor or viewer
 	CanWrite   bool      `json:"can_write"`
 	OwnerEmail string    `json:"owner_email,omitempty"`
+	TeamID     *int64    `json:"team_id,omitempty"`
+	TeamName   string    `json:"team_name,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // GetForUser looks a page up by key as a signed-in user. Write access is granted
-// by the write key, by owning the page, or by an editor share.
+// by the write key, by owning the page, by an editor share, or by membership of
+// the page's team.
 func (s *Store) GetForUser(ctx context.Context, key string, userID int64) (*Access, error) {
 	h := keys.Hash(key)
 	var (
 		a          Access
 		isWriteKey bool
 		role       *string
+		teamRole   *string
 		noReadKey  bool
 	)
 	err := s.db.QueryRow(ctx,
-		`SELECT p.id, p.owner_id, p.title, p.format, p.content, p.created_at, p.updated_at,
-		        p.write_key_hash = $1, s.role, p.read_key IS NULL
+		`SELECT p.id, p.owner_id, p.team_id, p.title, p.format, p.content, p.created_at, p.updated_at,
+		        p.write_key_hash = $1, s.role, tm.role, COALESCE(t.name, ''), p.read_key IS NULL
 		 FROM pages p
 		 LEFT JOIN page_shares s ON s.page_id = p.id AND s.user_id = $2
+		 LEFT JOIN team_members tm ON tm.team_id = p.team_id AND tm.user_id = $2
+		 LEFT JOIN teams t ON t.id = p.team_id
 		 WHERE p.read_key_hash = $1 OR p.write_key_hash = $1`, h, userID,
-	).Scan(&a.ID, &a.OwnerID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt, &isWriteKey, &role, &noReadKey)
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt,
+		&isWriteKey, &role, &teamRole, &a.TeamName, &noReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	switch {
-	case a.OwnerID != nil && *a.OwnerID == userID:
-		a.Role = RoleOwner
-	case role != nil:
-		a.Role = *role
+	if teamRole != nil {
+		a.TeamRole = *teamRole
 	}
+	a.Role = pageRole(userID, a.OwnerID, a.TeamID, a.TeamRole, role)
 	a.CanWrite = isWriteKey || a.Role == RoleOwner || a.Role == RoleEditor
 	if isWriteKey {
 		a.WriteKey = key
@@ -63,6 +68,25 @@ func (s *Store) GetForUser(ctx context.Context, key string, userID int64) (*Acce
 		s.backfillReadKey(ctx, &a)
 	}
 	return &a, nil
+}
+
+// pageRole works out a user's role on a page. On a team page the creator, team
+// owners and admins act as owner and other members as editors; someone who has
+// left the team keeps only what a direct share gives them.
+func pageRole(userID int64, ownerID, teamID *int64, teamRole string, shareRole *string) string {
+	switch {
+	case teamID != nil && (teamRole == TeamRoleOwner || teamRole == TeamRoleAdmin):
+		return RoleOwner
+	case teamID != nil && teamRole != "" && ownerID != nil && *ownerID == userID:
+		return RoleOwner
+	case teamID != nil && teamRole != "":
+		return RoleEditor
+	case teamID == nil && ownerID != nil && *ownerID == userID:
+		return RoleOwner
+	case shareRole != nil:
+		return *shareRole
+	}
+	return ""
 }
 
 // backfillReadKey stores the read key of an owned page that was assigned an
@@ -81,9 +105,9 @@ func (s *Store) backfillReadKey(ctx context.Context, a *Access) {
 func (s *Store) GetByID(ctx context.Context, id int64) (*Access, error) {
 	var a Access
 	err := s.db.QueryRow(ctx,
-		`SELECT id, owner_id, title, format, content, created_at, updated_at, COALESCE(read_key, '')
+		`SELECT id, owner_id, team_id, title, format, content, created_at, updated_at, COALESCE(read_key, '')
 		 FROM pages WHERE id = $1`, id,
-	).Scan(&a.ID, &a.OwnerID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt, &a.ReadKey)
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt, &a.ReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -156,18 +180,20 @@ func (s *Store) UpdateByID(ctx context.Context, id int64, c Changes) error {
 	return nil
 }
 
-// DeleteForUser deletes a page. Only the owner or a write-key holder may delete;
-// editors may change content but not remove the page.
-func (s *Store) DeleteForUser(ctx context.Context, key string, userID int64) error {
+// DeleteForUser deletes a page and returns what it was. Only the owner or a
+// write-key holder may delete; editors may change content but not remove it.
+func (s *Store) DeleteForUser(ctx context.Context, key string, userID int64) (*Access, error) {
 	a, err := s.GetForUser(ctx, key, userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if a.Role != RoleOwner && a.WriteKey == "" {
-		return ErrReadOnly
+		return nil, ErrReadOnly
 	}
-	_, err = s.db.Exec(ctx, `DELETE FROM pages WHERE id = $1`, a.ID)
-	return err
+	if _, err = s.db.Exec(ctx, `DELETE FROM pages WHERE id = $1`, a.ID); err != nil {
+		return nil, err
+	}
+	return a, nil
 }
 
 // Claim attaches an unowned page to userID, given its write key. Claiming a page
@@ -198,23 +224,26 @@ func (s *Store) Claim(ctx context.Context, writeKey string, userID int64) (*Acce
 	return s.GetForUser(ctx, writeKey, userID)
 }
 
-// CountOwned is the number of pages userID owns.
+// CountOwned is the number of personal (non-team) pages userID owns, which is
+// what the personal quota limits.
 func (s *Store) CountOwned(ctx context.Context, userID int64) (int, error) {
 	var n int
-	err := s.db.QueryRow(ctx, `SELECT count(*) FROM pages WHERE owner_id = $1`, userID).Scan(&n)
+	err := s.db.QueryRow(ctx, `SELECT count(*) FROM pages WHERE owner_id = $1 AND team_id IS NULL`, userID).Scan(&n)
 	return n, err
 }
 
-// ListOwnedAndShared returns every page the user owns or has been shared, newest first.
+// ListOwnedAndShared returns every page the user owns, has been shared, or can
+// reach through a team, newest first.
 func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64) ([]PageSummary, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT p.id, p.title, p.format, COALESCE(p.read_key, ''),
-		        CASE WHEN p.owner_id = $1 THEN 'owner' ELSE s.role END,
-		        COALESCE(o.email, ''), p.created_at, p.updated_at
+		`SELECT p.id, p.owner_id, p.team_id, COALESCE(t.name, ''), p.title, p.format, COALESCE(p.read_key, ''),
+		        s.role, COALESCE(tm.role, ''), COALESCE(o.email, ''), p.created_at, p.updated_at
 		 FROM pages p
 		 LEFT JOIN page_shares s ON s.page_id = p.id AND s.user_id = $1
+		 LEFT JOIN team_members tm ON tm.team_id = p.team_id AND tm.user_id = $1
+		 LEFT JOIN teams t ON t.id = p.team_id
 		 LEFT JOIN users o ON o.id = p.owner_id
-		 WHERE p.owner_id = $1 OR s.user_id = $1
+		 WHERE (p.owner_id = $1 AND p.team_id IS NULL) OR s.user_id = $1 OR tm.user_id = $1
 		 ORDER BY p.updated_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -222,15 +251,40 @@ func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64) ([]PageSum
 	defer rows.Close()
 	out := []PageSummary{}
 	for rows.Next() {
-		var p PageSummary
-		if err := rows.Scan(&p.ID, &p.Title, &p.Format, &p.ReadKey, &p.Role, &p.OwnerEmail, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		var (
+			p         PageSummary
+			ownerID   *int64
+			shareRole *string
+			teamRole  string
+		)
+		if err := rows.Scan(&p.ID, &ownerID, &p.TeamID, &p.TeamName, &p.Title, &p.Format, &p.ReadKey,
+			&shareRole, &teamRole, &p.OwnerEmail, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
+		p.Role = pageRole(userID, ownerID, p.TeamID, teamRole, shareRole)
+		if p.Role == "" {
+			continue
+		}
 		p.CanWrite = p.Role == RoleOwner || p.Role == RoleEditor
-		if p.Role == RoleOwner {
+		if ownerID != nil && *ownerID == userID {
 			p.OwnerEmail = ""
 		}
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// ListTeamPages returns a team's pages, newest first, for a member.
+func (s *Store) ListTeamPages(ctx context.Context, teamID, userID int64) ([]PageSummary, error) {
+	all, err := s.ListOwnedAndShared(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := []PageSummary{}
+	for _, p := range all {
+		if p.TeamID != nil && *p.TeamID == teamID {
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }

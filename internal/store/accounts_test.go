@@ -195,7 +195,7 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 	if out, err := st.UpdateForUser(ctx, a.ReadKey, other.ID, Changes{Content: ptr("edited")}); err != nil || out.Content != "edited" {
 		t.Fatalf("editor update: %+v %v", out, err)
 	}
-	if err := st.DeleteForUser(ctx, a.ReadKey, other.ID); !errors.Is(err, ErrReadOnly) {
+	if _, err := st.DeleteForUser(ctx, a.ReadKey, other.ID); !errors.Is(err, ErrReadOnly) {
 		t.Fatalf("editor delete: %v", err)
 	}
 	if _, err := st.ShareWith(ctx, a.ID, owner.ID, owner.Email, RoleViewer); !errors.Is(err, ErrConflict) {
@@ -233,7 +233,7 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 	}
 
 	// Owner can delete; shares go with the page.
-	if err := st.DeleteForUser(ctx, a.ReadKey, owner.ID); err != nil {
+	if _, err := st.DeleteForUser(ctx, a.ReadKey, owner.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.Get(ctx, a.ReadKey); !errors.Is(err, ErrNotFound) {

@@ -356,6 +356,11 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 		t.Fatalf("list_pages: %d %s", st, body)
 	}
 	st, _, body = f.mcp(access, rpcCall("share_page", `{"key":"`+anonWriteKey+`","email":"friend@example.com","role":"editor"}`))
+	if st != 200 || !strings.Contains(body, "Team plan") {
+		t.Fatalf("share without a team: %d %s", st, body)
+	}
+	e.activeTeam(t, email, "MCP team")
+	st, _, body = f.mcp(access, rpcCall("share_page", `{"key":"`+anonWriteKey+`","email":"friend@example.com","role":"editor"}`))
 	if st != 200 || strings.Contains(body, `"isError":true`) || !strings.Contains(body, "friend@example.com") {
 		t.Fatalf("share: %d %s", st, body)
 	}
@@ -364,6 +369,34 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 	}
 	if st, _, body = f.mcp(access, rpcCall("unshare_page", `{"key":"`+anonWriteKey+`","email":"friend@example.com"}`)); st != 200 || strings.Contains(body, `"isError":true`) {
 		t.Fatalf("unshare: %d %s", st, body)
+	}
+
+	// Team pages, comments and team listing over MCP.
+	if st, _, body = f.mcp(access, rpcCall("list_teams", `{}`)); st != 200 || !strings.Contains(body, "MCP team") {
+		t.Fatalf("list_teams: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("create_page", `{"content":"t","title":"team doc","team":"mcp team"}`)); st != 200 || strings.Contains(body, `"isError":true`) {
+		t.Fatalf("team create: %d %s", st, body)
+	}
+	m := regexp.MustCompile(`\\?"read_key\\?":\\?"([A-Za-z0-9_-]+)`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("no read key in %s", body)
+	}
+	teamKey := m[1]
+	if st, _, body = f.mcp(access, rpcCall("create_page", `{"content":"t","team":"nope"}`)); !strings.Contains(body, "list_teams") {
+		t.Fatalf("unknown team: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("add_comment", `{"key":"`+teamKey+`","body":"looks good"}`)); st != 200 || strings.Contains(body, `"isError":true`) {
+		t.Fatalf("add_comment: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("list_comments", `{"key":"`+teamKey+`"}`)); st != 200 || !strings.Contains(body, "looks good") {
+		t.Fatalf("list_comments: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("add_comment", `{"key":"`+anonWriteKey+`","body":"x"}`)); !strings.Contains(body, "team pages") {
+		t.Fatalf("comment on personal page: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("list_pages", `{}`)); !strings.Contains(body, "MCP team") {
+		t.Fatalf("list_pages team: %d %s", st, body)
 	}
 	// A garbage bearer is refused even for public tools.
 	if st, _, _ := f.mcp("cba_nope", rpcCall("get_page", `{"key":"`+anonWriteKey+`"}`)); st != 401 {

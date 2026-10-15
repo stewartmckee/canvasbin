@@ -127,6 +127,7 @@ type CreateInput struct {
 	Content string `json:"content" jsonschema:"page source: HTML (fragment or full document) or Markdown"`
 	Format  string `json:"format,omitempty" jsonschema:"html (default) or markdown"`
 	Title   string `json:"title,omitempty" jsonschema:"title shown in the browser tab"`
+	Team    string `json:"team,omitempty" jsonschema:"name or id of one of the user's teams to create the page in; omit for a personal page"`
 }
 
 type GetInput struct {
@@ -188,16 +189,18 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 	if t.Config.Accounts && t.user == nil {
 		return nil, PageResult{}, errors.New("sign in to create pages")
 	}
-	if t.user != nil {
-		if !t.user.Verified() {
-			return nil, PageResult{}, store.ErrUnverified
+	if t.user != nil && in.Team != "" {
+		team, terr := t.teamForCreate(ctx, in.Team)
+		if terr != nil {
+			return nil, PageResult{}, terr
 		}
-		n, cerr := t.Store.CountOwned(ctx, t.user.ID)
-		if cerr != nil {
-			return nil, PageResult{}, cerr
+		a, err = t.Store.CreateInTeam(ctx, t.user.ID, team.ID, in.Title, in.Format, in.Content)
+		if err == nil {
+			t.logPage(ctx, a, store.ActivityPageCreated)
 		}
-		if n >= t.Config.Quota(t.user) {
-			return nil, PageResult{}, store.ErrQuotaExceeded
+	} else if t.user != nil {
+		if err := t.checkQuota(ctx); err != nil {
+			return nil, PageResult{}, err
 		}
 		a, err = t.Store.CreateOwned(ctx, t.user.ID, in.Title, in.Format, in.Content)
 	} else {
@@ -238,6 +241,9 @@ func (t *tools) update(ctx context.Context, _ *mcp.CallToolRequest, in UpdateInp
 	var a *store.Access
 	if t.user != nil {
 		a, err = t.Store.UpdateForUser(ctx, key, t.user.ID, changes)
+		if err == nil {
+			t.logPage(ctx, a, store.ActivityPageEdited)
+		}
 	} else {
 		a, err = t.Store.Update(ctx, key, changes)
 	}
@@ -253,7 +259,11 @@ func (t *tools) remove(ctx context.Context, _ *mcp.CallToolRequest, in DeleteInp
 		return nil, DeleteResult{}, store.ErrNotFound
 	}
 	if t.user != nil {
-		err = t.Store.DeleteForUser(ctx, key, t.user.ID)
+		var a *store.Access
+		a, err = t.Store.DeleteForUser(ctx, key, t.user.ID)
+		if err == nil {
+			t.logPage(ctx, a, store.ActivityPageDeleted)
+		}
 	} else {
 		err = t.Store.Delete(ctx, key)
 	}

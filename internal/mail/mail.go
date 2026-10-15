@@ -19,6 +19,7 @@ type Sender interface {
 	SendVerify(ctx context.Context, email, link string) error
 	SendReset(ctx context.Context, email, link string) error
 	SendInvite(ctx context.Context, email, link, inviter string) error
+	SendTeamInvite(ctx context.Context, email, link, inviter, team string) error
 }
 
 // Client is a Mailgun client. The API key is never logged or included in errors.
@@ -91,8 +92,23 @@ func (c *Client) SendReset(ctx context.Context, email, link string) error {
 			"\n\nThis link expires in 1 hour. If you didn't ask for this, you can ignore this email.\n")
 }
 
+func oneLine(s string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ").Replace(strings.TrimSpace(s))
+}
+
+func (c *Client) SendTeamInvite(ctx context.Context, email, link, inviter, team string) error {
+	who := oneLine(inviter)
+	if who == "" {
+		who = "Someone"
+	}
+	name := oneLine(team)
+	return c.send(ctx, email, who+" added you to "+name+" on Canvasbin",
+		who+" added you to the team \""+name+"\" on Canvasbin, where you can view, edit and comment on the team's pages.\n\n"+
+			"Sign up or log in with this email address to join:\n\n"+link+"\n")
+}
+
 func (c *Client) SendInvite(ctx context.Context, email, link, inviter string) error {
-	who := strings.NewReplacer("\r", " ", "\n", " ").Replace(strings.TrimSpace(inviter))
+	who := oneLine(inviter)
 	if who == "" {
 		who = "Someone"
 	}

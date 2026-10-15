@@ -49,6 +49,7 @@ var (
 type Page struct {
 	ID        int64     `json:"-"`
 	OwnerID   *int64    `json:"-"`
+	TeamID    *int64    `json:"-"`
 	Title     string    `json:"title"`
 	Format    string    `json:"format"`
 	Content   string    `json:"content"`
@@ -62,7 +63,10 @@ type Access struct {
 	CanWrite bool
 	// Role is the signed-in user's relationship to the page: "owner", "editor",
 	// "viewer", or "" when accessed anonymously by key.
-	Role     string
+	Role string
+	// TeamRole is the user's role in the page's team, if they belong to it.
+	TeamRole string
+	TeamName string
 	ReadKey  string
 	WriteKey string // empty unless the key used was the write key
 }
@@ -129,16 +133,22 @@ func cleanTitle(t string) string {
 }
 
 func (s *Store) Create(ctx context.Context, title, format, content string) (*Access, error) {
-	return s.create(ctx, nil, title, format, content)
+	return s.create(ctx, nil, nil, title, format, content)
 }
 
 // CreateOwned creates a page owned by userID. The read key is retained on the
 // row (see schema) so the owner's library can link to the page.
 func (s *Store) CreateOwned(ctx context.Context, ownerID int64, title, format, content string) (*Access, error) {
-	return s.create(ctx, &ownerID, title, format, content)
+	return s.create(ctx, &ownerID, nil, title, format, content)
 }
 
-func (s *Store) create(ctx context.Context, ownerID *int64, title, format, content string) (*Access, error) {
+// CreateInTeam creates a team page with userID as its creator. Callers check
+// membership, subscription and quota first.
+func (s *Store) CreateInTeam(ctx context.Context, userID, teamID int64, title, format, content string) (*Access, error) {
+	return s.create(ctx, &userID, &teamID, title, format, content)
+}
+
+func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, format, content string) (*Access, error) {
 	format, err := NormalizeFormat(format)
 	if err != nil {
 		return nil, err
@@ -152,16 +162,16 @@ func (s *Store) create(ctx context.Context, ownerID *int64, title, format, conte
 	}
 	readKey := keys.ReadFromWrite(writeKey)
 	a := &Access{CanWrite: true, ReadKey: readKey, WriteKey: writeKey}
-	a.Title, a.Format, a.Content, a.OwnerID = cleanTitle(title), format, content, ownerID
+	a.Title, a.Format, a.Content, a.OwnerID, a.TeamID = cleanTitle(title), format, content, ownerID, teamID
 	var storedReadKey *string
 	if ownerID != nil {
 		storedReadKey = &readKey
 		a.Role = RoleOwner
 	}
 	err = s.db.QueryRow(ctx,
-		`INSERT INTO pages (title, format, content, read_key_hash, write_key_hash, owner_id, read_key)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at, updated_at`,
-		a.Title, a.Format, a.Content, keys.Hash(readKey), keys.Hash(writeKey), ownerID, storedReadKey,
+		`INSERT INTO pages (title, format, content, read_key_hash, write_key_hash, owner_id, read_key, team_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`,
+		a.Title, a.Format, a.Content, keys.Hash(readKey), keys.Hash(writeKey), ownerID, storedReadKey, teamID,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
