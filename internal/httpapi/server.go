@@ -38,8 +38,8 @@ type Server struct {
 	CreateLimit   *ratelimit.Limiter
 	Web           fs.FS
 	MCP           http.Handler
-	PDF      *pdf.Renderer
-	PDFLimit *ratelimit.Limiter
+	PDF           *pdf.Renderer
+	PDFLimit      *ratelimit.Limiter
 	// SelfURL is how the PDF renderer reaches this server, e.g. http://127.0.0.1:8080.
 	SelfURL string
 
@@ -110,7 +110,10 @@ func (s *Server) Handler() http.Handler {
 
 // marketingPaths are the public site pages search engines may index when
 // accounts are on. Everything else (pages, app screens, API) stays noindex.
-var marketingPaths = []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact"}
+var marketingPaths = []string{
+	"/", "/features", "/pricing", "/privacy", "/terms", "/contact",
+	"/use-cases", "/use-cases/developers", "/use-cases/business", "/use-cases/family",
+}
 
 func (s *Server) indexable(r *http.Request) bool {
 	if !s.accounts() || (r.Method != http.MethodGet && r.Method != http.MethodHead) {

@@ -27,6 +27,8 @@ const groups = [
       ['Claude, ChatGPT and Cursor', 'Connect once and your assistant can publish, update and share pages for you.'],
       ['Secure sign-in', 'Your AI asks you to sign in to Canvasbin before it publishes, and only acts on your account.'],
       ['Keeps pages current', 'Ask your assistant to refresh a report and the same link shows the new version.'],
+      ['Runs on a schedule', 'Pair Canvasbin with Cursor Automations or scheduled tasks and dashboards update themselves.'],
+      ['Rich, interactive pages', 'Agents can use charts, diagrams and scripts, anything a web page can do.'],
     ],
   },
   {
@@ -62,6 +64,9 @@ const groups = [
           <p class="muted">{{ body }}</p>
         </article>
       </div>
+      <p v-if="g.title === 'Work with AI'" class="usecase-link">
+        <RouterLink to="/use-cases">See live examples for developers, business and families →</RouterLink>
+      </p>
     </section>
     <section class="section cta">
       <h2>Ready to publish?</h2>

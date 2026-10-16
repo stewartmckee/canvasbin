@@ -16,6 +16,8 @@ import PricingView from './views/PricingView.vue'
 import ContactView from './views/ContactView.vue'
 import PrivacyView from './views/PrivacyView.vue'
 import TermsView from './views/TermsView.vue'
+import UseCasesView from './views/UseCasesView.vue'
+import UseCaseView from './views/UseCaseView.vue'
 import { auth, currentUser, initAuth, isAdmin } from './auth.js'
 
 const marketing = (title) => ({ accounts: true, title })
@@ -28,6 +30,14 @@ export const router = createRouter({
     { path: '/new', name: 'new', component: HomeView, meta: { accounts: true, auth: true, title: 'New page' } },
     { path: '/features', name: 'features', component: FeaturesView, meta: marketing('Features') },
     { path: '/pricing', name: 'pricing', component: PricingView, meta: marketing('Pricing') },
+    { path: '/use-cases', name: 'use-cases', component: UseCasesView, meta: marketing('Use cases') },
+    {
+      path: '/use-cases/:slug(developers|business|family)',
+      name: 'use-case',
+      component: UseCaseView,
+      props: true,
+      meta: { accounts: true },
+    },
     { path: '/contact', name: 'contact', component: ContactView, meta: marketing('Contact') },
     { path: '/privacy', name: 'privacy', component: PrivacyView, meta: marketing('Privacy policy') },
     { path: '/terms', name: 'terms', component: TermsView, meta: marketing('Terms of service') },

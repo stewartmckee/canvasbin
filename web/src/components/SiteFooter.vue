@@ -25,6 +25,12 @@ const year = new Date().getFullYear()
           <RouterLink v-else to="/account">Account</RouterLink>
         </div>
         <div>
+          <h4>Use cases</h4>
+          <RouterLink to="/use-cases/developers">Developers</RouterLink>
+          <RouterLink to="/use-cases/business">Business</RouterLink>
+          <RouterLink to="/use-cases/family">Family &amp; hobbies</RouterLink>
+        </div>
+        <div>
           <h4>Company</h4>
           <RouterLink to="/contact">Contact</RouterLink>
           <RouterLink to="/privacy">Privacy</RouterLink>

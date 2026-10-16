@@ -1079,11 +1079,148 @@ code {
   margin: 1.5rem auto 0;
 }
 
+.usecase-note {
+  max-width: 640px;
+  margin: -0.6rem auto 1.4rem;
+}
+.samples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.2rem;
+}
+.samples.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sample {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 60px -36px rgba(29, 36, 51, 0.4);
+}
+.sample-frame {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--line);
+}
+.sample-frame .mock-bar {
+  align-items: center;
+}
+.sample-url {
+  margin-left: 0.6rem;
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sample iframe {
+  width: 100%;
+  height: 440px;
+  border: 0;
+  background: #fff;
+}
+.sample.tall iframe {
+  height: 760px;
+}
+.sample-body {
+  padding: 1rem 1.2rem 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.sample-body h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.sample-body p {
+  margin: 0;
+}
+.sample-schedule {
+  color: var(--read);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.sample-body a {
+  font-weight: 600;
+  margin-top: 0.2rem;
+}
+.prompts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.prompts li {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  font-style: italic;
+}
+.schedulers {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.usecase-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.usecase-card {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.3rem 1.4rem;
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.usecase-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.usecase-card strong {
+  font-size: 1.1rem;
+}
+.usecase-icon {
+  font-size: 1.8rem;
+}
+.usecase-more {
+  color: var(--accent);
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
 @media (max-width: 760px) {
   .steps,
   .feature-grid,
-  .plans {
+  .plans,
+  .prompts {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .samples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sample.tall iframe {
+    height: 620px;
+  }
+  .footer-cols {
+    gap: 1.6rem;
+    flex-wrap: wrap;
   }
   .band {
     flex-direction: column;

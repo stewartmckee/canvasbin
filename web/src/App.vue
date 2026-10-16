@@ -24,6 +24,7 @@ import { accountsEnabled, currentUser } from './auth.js'
       </template>
       <template v-else>
         <RouterLink to="/features" class="topnav-link">Features</RouterLink>
+        <RouterLink to="/use-cases" class="topnav-link">Use cases</RouterLink>
         <RouterLink to="/pricing" class="topnav-link">Pricing</RouterLink>
         <RouterLink to="/login" class="btn ghost small">Sign in</RouterLink>
         <RouterLink to="/register" class="btn primary small">Get started</RouterLink>

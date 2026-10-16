@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import PlanCards from '../components/PlanCards.vue'
 import { auth } from '../auth.js'
+import { useCases } from '../usecases.js'
 
 const route = useRoute()
 const notice = computed(
@@ -112,6 +113,18 @@ const features = [
         </p>
       </div>
       <RouterLink to="/register" class="btn primary">Connect your AI</RouterLink>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Pages that keep themselves up to date</h2>
+      <div class="usecase-cards">
+        <RouterLink v-for="u in useCases" :key="u.slug" :to="`/use-cases/${u.slug}`" class="usecase-card">
+          <span class="usecase-icon">{{ u.icon }}</span>
+          <strong>{{ u.label }}</strong>
+          <span class="muted">{{ u.summary }}</span>
+          <span class="usecase-more">See live examples →</span>
+        </RouterLink>
+      </div>
     </section>
 
     <section class="section">

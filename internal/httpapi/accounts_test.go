@@ -428,7 +428,7 @@ func TestMarketingPagesIndexable(t *testing.T) {
 		return resp
 	}
 	on := newEnv(t, true, 20)
-	for _, p := range []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact"} {
+	for _, p := range []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact", "/use-cases", "/use-cases/family"} {
 		if r := get(on.srv, p); r.StatusCode != 200 || r.Header.Get("X-Robots-Tag") != "" {
 			t.Errorf("%s: status %d robots %q", p, r.StatusCode, r.Header.Get("X-Robots-Tag"))
 		}
