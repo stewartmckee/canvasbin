@@ -3,8 +3,10 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"html"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -52,6 +54,27 @@ func Document(p store.Page) (string, error) {
 		}
 		return wrap(p.Title, fragmentCSS, p.Content), nil
 	}
+}
+
+var closeBodyRe = regexp.MustCompile(`(?i)</body\s*>`)
+
+// liveReloadJS reconnects with backoff and reloads when the page changes, or
+// when it changed while the socket was down (hello carries the current version).
+const liveReloadJS = `(function(){var k=%s,v=%s,d=1000;function go(){var ws;try{ws=new WebSocket((location.protocol=="https:"?"wss://":"ws://")+location.host+"/api/pages/"+k+"/live")}catch(e){return}` +
+	`ws.onopen=function(){d=1000};ws.onmessage=function(e){var m;try{m=JSON.parse(e.data)}catch(x){return}` +
+	`if(m.type=="updated"||m.type=="deleted"||(m.type=="hello"&&m.updated_at!=v)){ws.onclose=null;location.reload()}};` +
+	`ws.onclose=function(){setTimeout(go,d);d=Math.min(d*2,30000)}}go()})();`
+
+// WithLiveReload adds a script that reloads the document when the page with
+// readKey changes after version (the page's updated_at as sent by the server).
+func WithLiveReload(doc, readKey, version string) string {
+	tag := `<script data-canvasbin-live>` + fmt.Sprintf(liveReloadJS, strconv.Quote(readKey), strconv.Quote(version)) + `</script>`
+	locs := closeBodyRe.FindAllStringIndex(doc, -1)
+	if len(locs) == 0 {
+		return doc + "\n" + tag + "\n"
+	}
+	at := locs[len(locs)-1][0]
+	return doc[:at] + tag + "\n" + doc[at:]
 }
 
 func wrap(title, css, body string) string {

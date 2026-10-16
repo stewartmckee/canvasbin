@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 5173,
-    proxy: Object.fromEntries(proxied.map((p) => [p, { target: backend, changeOrigin: false }])),
+    proxy: Object.fromEntries(proxied.map((p) => [p, { target: backend, changeOrigin: false, ws: p === '/api' }])),
   },
   build: {
     outDir: 'dist',

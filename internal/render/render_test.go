@@ -28,3 +28,13 @@ func TestMarkdown(t *testing.T) {
 		t.Fatalf("unexpected markdown: %s", got)
 	}
 }
+
+func TestWithLiveReload(t *testing.T) {
+	got := WithLiveReload("<html><body><p>x</p></BODY></html>", "k", "v")
+	if !strings.Contains(got, `<p>x</p><script data-canvasbin-live>`) || !strings.HasSuffix(got, "</BODY></html>") {
+		t.Fatalf("script should sit before the closing body tag: %s", got)
+	}
+	if got := WithLiveReload("<p>fragment</p>", "k", "v"); !strings.HasPrefix(got, "<p>fragment</p>\n<script data-canvasbin-live>") {
+		t.Fatalf("script should be appended when there is no body tag: %s", got)
+	}
+}

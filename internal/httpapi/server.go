@@ -18,6 +18,7 @@ import (
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
 	"github.com/stewartmckee/canvasbin/internal/links"
+	"github.com/stewartmckee/canvasbin/internal/live"
 	"github.com/stewartmckee/canvasbin/internal/mail"
 	"github.com/stewartmckee/canvasbin/internal/oauth"
 	"github.com/stewartmckee/canvasbin/internal/pdf"
@@ -42,6 +43,8 @@ type Server struct {
 	PDFLimit      *ratelimit.Limiter
 	// SelfURL is how the PDF renderer reaches this server, e.g. http://127.0.0.1:8080.
 	SelfURL string
+	// Live, when set, pushes page changes to open browsers (see RunLive).
+	Live *live.Hub
 
 	// Accounts (all optional; only used when Config.Accounts is on).
 	Config    config.Config
@@ -61,6 +64,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/pages/{key}", s.get)
 	mux.HandleFunc("PUT /api/pages/{key}", s.update)
 	mux.HandleFunc("DELETE /api/pages/{key}", s.remove)
+	mux.HandleFunc("GET /api/pages/{key}/live", s.liveUpdates)
 	mux.HandleFunc("POST /api/render", s.preview)
 	mux.HandleFunc("GET /api/config", s.publicConfig)
 	if s.accounts() {
@@ -359,6 +363,9 @@ func (s *Server) view(w http.ResponseWriter, r *http.Request, key string) {
 		http.Error(w, "could not render page", http.StatusInternalServerError)
 		return
 	}
+	if s.Live != nil && r.URL.Query().Get("live") != "0" {
+		doc = render.WithLiveReload(doc, a.ReadKey, liveTime(a.UpdatedAt))
+	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Content-Security-Policy", viewCSP)
@@ -379,7 +386,7 @@ func (s *Server) pdfDownload(w http.ResponseWriter, r *http.Request, key string)
 		http.Error(w, "too many PDF requests, try again shortly", http.StatusTooManyRequests)
 		return
 	}
-	out, err := s.PDF.Render(r.Context(), s.SelfURL+"/"+a.ReadKey+".html")
+	out, err := s.PDF.Render(r.Context(), s.SelfURL+"/"+a.ReadKey+".html?live=0")
 	if errors.Is(err, pdf.ErrBusy) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return

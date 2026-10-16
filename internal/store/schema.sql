@@ -1,3 +1,6 @@
+-- The whole file runs as one implicit transaction; serialise concurrent starts.
+SELECT pg_advisory_xact_lock(4242001);
+
 CREATE TABLE IF NOT EXISTS pages (
     id             bigserial PRIMARY KEY,
     title          text        NOT NULL DEFAULT '',
@@ -186,3 +189,24 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
     revoked_at         timestamptz,
     created_at         timestamptz NOT NULL DEFAULT now()
 );
+
+-- Live reload: tell listeners when a page's visible content changes or it is
+-- deleted. Ownership and sharing changes do not notify.
+CREATE OR REPLACE FUNCTION notify_page_change() RETURNS trigger AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        PERFORM pg_notify('page_changed', json_build_object('id', OLD.id, 'deleted', true)::text);
+        RETURN OLD;
+    END IF;
+    IF NEW.title IS DISTINCT FROM OLD.title
+       OR NEW.format IS DISTINCT FROM OLD.format
+       OR NEW.content IS DISTINCT FROM OLD.content THEN
+        PERFORM pg_notify('page_changed', json_build_object('id', NEW.id, 'updated_at', NEW.updated_at)::text);
+    END IF;
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER pages_notify_change
+    AFTER UPDATE OR DELETE ON pages
+    FOR EACH ROW EXECUTE FUNCTION notify_page_change();

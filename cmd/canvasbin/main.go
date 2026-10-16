@@ -14,6 +14,7 @@ import (
 	"github.com/stewartmckee/canvasbin/internal/billing"
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/httpapi"
+	"github.com/stewartmckee/canvasbin/internal/live"
 	"github.com/stewartmckee/canvasbin/internal/mail"
 	"github.com/stewartmckee/canvasbin/internal/mcpserver"
 	"github.com/stewartmckee/canvasbin/internal/pdf"
@@ -60,7 +61,9 @@ func run() error {
 		PDFLimit:      ratelimit.New(20, 10*time.Minute),
 		SelfURL:       selfURL(addr),
 		Config:        cfg,
+		Live:          live.New(10000),
 	}
+	go srv.RunLive(ctx)
 	mcpOpts := mcpserver.Options{
 		Store: st, PublicBaseURL: base, CreateLimit: limiter, Version: version, Config: cfg,
 	}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stewartmckee/canvasbin/internal/config"
+	"github.com/stewartmckee/canvasbin/internal/live"
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
 
@@ -66,8 +67,12 @@ func newEnv(t *testing.T, accounts bool, quota int) *env {
 	cfg := config.Config{Accounts: accounts, FreeQuota: quota, ProQuota: 1000}
 	s := &Server{
 		Store: st, Config: cfg, Mailer: m,
-		Web: fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
+		Web:  fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
+		Live: live.New(100),
 	}
+	ctx, stop := context.WithCancel(context.Background())
+	t.Cleanup(stop)
+	go s.RunLive(ctx)
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
 	return &env{srv: ts, mail: m, st: st}

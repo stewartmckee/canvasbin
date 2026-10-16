@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, shallowRef } from 'vue'
+import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import SharePanel from '../components/SharePanel.vue'
@@ -8,6 +8,7 @@ import { claimPage, deletePage, getPage, updatePage } from '../api.js'
 import { accountsEnabled, currentUser, loadMe } from '../auth.js'
 import { forgetPage, rememberPage } from '../recent.js'
 import { useLeaveGuard } from '../composables/useLeaveGuard.js'
+import { watchPage } from '../live.js'
 
 const props = defineProps({ pageKey: { type: String, required: true } })
 
@@ -32,14 +33,25 @@ function setTitle(p) {
   document.title = `${p.title || 'Untitled'} · Canvasbin`
 }
 
+// Bumped to remount the editor with content that changed elsewhere.
+const editorKey = ref(0)
+const changedElsewhere = ref(false)
+let stopWatching = null
+let recheckAfterSave = false
+
+function load(p) {
+  page.value = p
+  initial.value = { title: p.title, format: p.format, content: p.content }
+  status.value = savedStatus(p)
+  setTitle(p)
+}
+
 onMounted(async () => {
   try {
     const p = await getPage(props.pageKey)
-    page.value = p
-    initial.value = { title: p.title, format: p.format, content: p.content }
-    status.value = savedStatus(p)
+    load(p)
     if (p.can_write) rememberPage(p)
-    setTitle(p)
+    stopWatching = watchPage(props.pageKey, onLiveEvent)
   } catch (e) {
     if (e.status === 404) forgetPage(props.pageKey)
     error.value = e.status === 404 ? 'This page does not exist or has been deleted.' : e.message
@@ -47,6 +59,57 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onBeforeUnmount(() => stopWatching?.())
+
+function onLiveEvent(msg) {
+  if (msg.type === 'deleted') {
+    forgetPage(props.pageKey)
+    dirty.value = false
+    error.value = 'This page has been deleted.'
+    return
+  }
+  if (msg.type === 'hello' && page.value && Date.parse(msg.updated_at) === Date.parse(page.value.updated_at)) return
+  if (saving.value) {
+    recheckAfterSave = true
+    return
+  }
+  checkForChanges()
+}
+
+// Our own saves also trigger events; only react if the server copy differs
+// from the one we last loaded or saved.
+async function checkForChanges() {
+  let p
+  try {
+    p = await getPage(props.pageKey)
+  } catch (e) {
+    if (e.status === 404) onLiveEvent({ type: 'deleted' })
+    return
+  }
+  if (!page.value || p.updated_at === page.value.updated_at) return
+  if (dirty.value) {
+    changedElsewhere.value = true
+    return
+  }
+  applyRemote(p)
+}
+
+function applyRemote(p) {
+  load(p)
+  changedElsewhere.value = false
+  editorKey.value++
+  teamPanel.value?.refreshActivity()
+}
+
+async function loadLatest() {
+  if (!window.confirm('Load the latest version? Your unsaved changes will be lost.')) return
+  try {
+    applyRemote(await getPage(props.pageKey))
+  } catch (e) {
+    saveError.value = e.message
+  }
+}
 
 async function save(changes) {
   saving.value = true
@@ -58,12 +121,17 @@ async function save(changes) {
     status.value = savedStatus(p)
     rememberPage(p)
     fresh.value = false
+    changedElsewhere.value = false
     setTitle(p)
     teamPanel.value?.refreshActivity()
   } catch (e) {
     saveError.value = e.message
   } finally {
     saving.value = false
+    if (recheckAfterSave) {
+      recheckAfterSave = false
+      checkForChanges()
+    }
   }
 }
 
@@ -123,8 +191,14 @@ async function remove() {
         <span class="muted small">Claiming adds it to your library.</span>
       </p>
       <p v-if="saveError" class="notice error">{{ saveError }}</p>
+      <p v-if="changedElsewhere" class="notice claim">
+        This page was changed somewhere else since you started editing.
+        <button type="button" class="btn small" @click="loadLatest">Load latest</button>
+        <span class="muted small">Saving now will replace those changes with yours.</span>
+      </p>
       <PageEditor
         ref="editor"
+        :key="editorKey"
         :page="initial"
         :mode="page.can_write ? 'edit' : 'view'"
         :saving="saving"
