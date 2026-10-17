@@ -105,7 +105,7 @@ func (t *tools) addAccountTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_teams",
 		Title:       "List my teams",
-		Description: "List the teams the signed-in user belongs to, with their role, whether the team plan is active, and page counts. Use a team's name or id as create_page's team argument.",
+		Description: "List the teams the signed-in user belongs to, with their role, whether the team plan is active, and page counts.",
 		Annotations: readTool(),
 	}, t.listTeams)
 	mcp.AddTool(s, &mcp.Tool{
