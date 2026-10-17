@@ -17,6 +17,7 @@ const groups = [
     items: [
       ['Read-only links', 'A clean, fast page for your audience. They never see the editor.'],
       ['Edit links', 'A private link that lets you, or anyone you trust, change the page.'],
+      ['Live updates', 'When a page changes, it refreshes by itself in every viewer’s browser. No reloading needed.'],
       ['PDF downloads', 'Swap the link for a PDF version of any page with one click.'],
       ['Invite by email', 'Give people viewer or editor access. They get an email and the page shows up in their library.'],
     ],

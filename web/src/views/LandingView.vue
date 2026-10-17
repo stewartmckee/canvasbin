@@ -21,15 +21,15 @@ const features = [
   },
   {
     title: 'HTML or Markdown',
-    body: 'Write in a visual editor or straight in source, with a live preview of exactly what people will see.',
-  },
-  {
-    title: 'Web, PDF and Markdown',
-    body: 'Every page is a fast web page, a one-click PDF download and, for Markdown, the original source.',
+    body: 'Write visually or in source. Every page is a fast web page and a one-click PDF download.',
   },
   {
     title: 'Built for AI agents',
     body: 'Claude, ChatGPT and Cursor can publish and update pages for you. Sign in once and they just work.',
+  },
+  {
+    title: 'Live updates',
+    body: 'Edit a page, or let your agent update it, and everyone viewing it sees the change instantly. No reloading needed.',
   },
   {
     title: 'Share with people',

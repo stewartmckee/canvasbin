@@ -132,8 +132,8 @@ export const capabilities = [
   ['Charts and graphs', 'Chart.js, D3, ECharts or hand-drawn SVG, whatever the agent likes.'],
   ['Diagrams', 'Mermaid flowcharts, sequence diagrams and data models.'],
   ['Interactivity', 'Filters, tabs, tooltips and toggles, all in plain JavaScript.'],
-  ['Any layout', 'Full HTML and CSS: dark mode, animation, custom fonts, mobile-first.'],
-  ['PDF and print', 'Every page is also a one-click PDF for email or meetings.'],
+  ['Any layout', 'Full HTML and CSS: dark mode, animation, custom fonts, mobile-first, plus a one-click PDF.'],
+  ['Live updates', 'When the agent updates a page, open browsers refresh by themselves. Great for wall screens.'],
   ['Safe by default', 'Scripts run in a sandbox, away from Canvasbin and your account.'],
 ]
 
