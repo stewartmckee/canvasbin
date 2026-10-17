@@ -11,6 +11,28 @@
       content="Publish HTML and Markdown pages with a shareable link, a PDF and a private edit link. Works with Claude, ChatGPT and Cursor."
     />
     <title>Canvasbin</title>
+    <script>
+      // Page keys (read or edit) and page titles must never reach analytics.
+      window.canvasbinAnalytics = function (type, payload) {
+        var hasKey = /[A-Za-z0-9_-]{43}/
+        var redact = function (u) {
+          return u ? u.replace(/[A-Za-z0-9_-]{43}/g, '{page}') : u
+        }
+        if (hasKey.test(payload.url || '')) payload.title = 'Page'
+        payload.url = redact(payload.url)
+        payload.referrer = redact(payload.referrer)
+        return payload
+      }
+    </script>
+    <script
+      defer
+      src="https://bucket.mckee.family/script.js"
+      data-website-id="bfcdc1d2-7657-48e6-a1b2-ba0b318ed36f"
+      data-domains="canvasbin.dev"
+      data-exclude-search="true"
+      data-exclude-hash="true"
+      data-before-send="canvasbinAnalytics"
+    ></script>
   </head>
   <body>
     <div id="app"></div>
