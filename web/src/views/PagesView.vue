@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import CopyLinkButton from '../components/CopyLinkButton.vue'
+import UpgradePrompt from '../components/UpgradePrompt.vue'
 import { editRoute, getLibrary, getPage, htmlPath, parseLink } from '../api.js'
 import { auth, currentUser, myTeams } from '../auth.js'
 import { planName } from '../site.js'
@@ -40,6 +41,13 @@ const teamSections = computed(() =>
 const libraryReadKeys = computed(() => new Set(library.value.map((p) => p.read_key).filter(Boolean)))
 const localPages = computed(() => recentPages.value.filter((p) => !libraryReadKeys.value.has(p.readKey)))
 const verified = computed(() => Boolean(currentUser.value?.email_verified_at))
+// Free users see the offer from two pages short of the limit; paid users only once full.
+const showUpgrade = computed(() => {
+  const me = auth.me
+  if (!me || !me.quota) return false
+  if (me.page_count >= me.quota) return true
+  return me.plan !== 'pro' && auth.billingEnabled && me.page_count >= me.quota - 2
+})
 
 async function loadLibrary() {
   try {
@@ -93,6 +101,7 @@ function formatDate(s) {
     </section>
 
     <p v-if="notice" class="notice">{{ notice }}</p>
+    <UpgradePrompt v-if="showUpgrade" from="pages" />
     <p v-if="loadError" class="notice error">{{ loadError }}</p>
 
     <section v-for="s in teamSections" :key="s.team.id" class="panel mt">

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import SharePanel from '../components/SharePanel.vue'
 import TeamPagePanel from '../components/TeamPagePanel.vue'
+import UpgradePrompt from '../components/UpgradePrompt.vue'
 import { claimPage, deletePage, getPage, updatePage } from '../api.js'
 import { accountsEnabled, currentUser, loadMe } from '../auth.js'
 import { forgetPage, rememberPage } from '../recent.js'
@@ -136,6 +137,7 @@ async function save(changes) {
 }
 
 const claiming = ref(false)
+const claimFull = ref(false)
 // A signed-out visitor on a read-only link may have been invited to edit it.
 const showSignIn = () => Boolean(accountsEnabled.value && !currentUser.value && page.value && !page.value.can_write)
 const signInRoute = () => ({ name: 'login', query: { next: `/${props.pageKey}` } })
@@ -149,7 +151,8 @@ async function claim() {
     page.value = await claimPage(props.pageKey)
     loadMe()
   } catch (e) {
-    saveError.value = e.message
+    if (e.code === 'quota_exceeded') claimFull.value = true
+    else saveError.value = e.message
   } finally {
     claiming.value = false
   }
@@ -190,6 +193,7 @@ async function remove() {
         </button>
         <span class="muted small">Claiming adds it to your library.</span>
       </p>
+      <UpgradePrompt v-if="claimFull && canClaim()" from="claim" />
       <p v-if="saveError" class="notice error">{{ saveError }}</p>
       <p v-if="changedElsewhere" class="notice claim">
         This page was changed somewhere else since you started editing.

@@ -248,7 +248,7 @@ func TestOwnedPagesQuotaAndSharing(t *testing.T) {
 	readKey, writeKey := p["read_key"].(string), p["write_key"].(string)
 	owner.want(201, "POST", "/api/pages", map[string]string{"content": "b"})
 	out := owner.want(403, "POST", "/api/pages", map[string]string{"content": "c"})
-	if out["code"] != "quota_exceeded" {
+	if out["code"] != "quota_exceeded" || !strings.Contains(fmt.Sprint(out["error"]), "pages on the Free plan are in use") {
 		t.Fatalf("want quota_exceeded: %v", out)
 	}
 

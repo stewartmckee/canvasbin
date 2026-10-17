@@ -159,6 +159,10 @@ code {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+.notice.upsell {
+  background: var(--accent-soft);
+  border-color: #d6dafc;
+}
 .notice.error {
   background: #fdecec;
   border-color: #f4c2c2;

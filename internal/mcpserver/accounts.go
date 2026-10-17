@@ -12,6 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/stewartmckee/canvasbin/internal/auth"
+	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
 	"github.com/stewartmckee/canvasbin/internal/links"
 	"github.com/stewartmckee/canvasbin/internal/store"
@@ -27,6 +28,8 @@ create_page publishes into the user's own library and counts toward their page q
 - share_page: give someone access to an owned page by email (viewer or editor); they are emailed an invitation. Team plan only.
 - unshare_page: remove someone's access.
 - list_comments / add_comment: read and post comments on a team page. Team members only.
+
+If create_page or claim_page fails because the page quota is full, pass the error's options (upgrade link or deleting a page) on to the user. Never delete their pages to make room unless they ask you to.
 
 ` + pageInstructions
 
@@ -167,7 +170,7 @@ func (t *tools) listTeams(ctx context.Context, _ *mcp.CallToolRequest, _ ListPag
 // it can take another page.
 func (t *tools) teamForCreate(ctx context.Context, ref string) (*store.Team, error) {
 	if !t.user.Verified() {
-		return nil, store.ErrUnverified
+		return nil, config.UnverifiedError(t.base)
 	}
 	teams, err := t.Store.ListTeams(ctx, t.user.ID)
 	if err != nil {
@@ -185,10 +188,10 @@ func (t *tools) teamForCreate(ctx context.Context, ref string) (*store.Team, err
 		return nil, fmt.Errorf("no team called %q; call list_teams to see the user's teams", ref)
 	}
 	if !match.Active() {
-		return nil, store.ErrTeamInactive
+		return nil, config.TeamInactiveError(t.base, match.ID)
 	}
 	if match.PageCount >= t.Config.TeamPageQuota() {
-		return nil, store.ErrQuotaExceeded
+		return nil, t.Config.TeamQuotaError()
 	}
 	return match, nil
 }
@@ -313,14 +316,14 @@ func (t *tools) claim(ctx context.Context, _ *mcp.CallToolRequest, in ClaimInput
 // checkQuota mirrors the HTTP API: verified email and room under the quota.
 func (t *tools) checkQuota(ctx context.Context) error {
 	if !t.user.Verified() {
-		return store.ErrUnverified
+		return config.UnverifiedError(t.base)
 	}
 	n, err := t.Store.CountOwned(ctx, t.user.ID)
 	if err != nil {
 		return err
 	}
 	if n >= t.Config.Quota(t.user) {
-		return store.ErrQuotaExceeded
+		return t.Config.QuotaError(t.user, t.base)
 	}
 	return nil
 }

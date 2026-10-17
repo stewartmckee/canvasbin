@@ -1,10 +1,11 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
+import UpgradePrompt from '../components/UpgradePrompt.vue'
 import McpConnect from '../components/McpConnect.vue'
 import { createPage, editRoute, getPage, htmlPath, parseLink } from '../api.js'
-import { accountsEnabled, activeTeams, currentUser, loadMe } from '../auth.js'
+import { accountsEnabled, activeTeams, auth, currentUser, loadMe } from '../auth.js'
 import { forgetPage, pruneRecent, recentPages, rememberPage } from '../recent.js'
 import { useLeaveGuard } from '../composables/useLeaveGuard.js'
 
@@ -18,6 +19,10 @@ const saving = ref(false)
 const error = ref('')
 const openInput = ref('')
 const openError = ref('')
+const quotaHit = ref(false)
+const personalFull = computed(
+  () => !space.value && (quotaHit.value || (auth.me?.quota > 0 && auth.me.page_count >= auth.me.quota)),
+)
 
 const blank = { title: '', format: 'html', content: '' }
 
@@ -34,7 +39,12 @@ async function create(page) {
     dirty.value = false
     await router.replace({ ...editRoute(created.write_key), state: { created: true } })
   } catch (e) {
-    error.value = e.message
+    if (e.code === 'quota_exceeded' && !space.value) {
+      quotaHit.value = true
+      if (currentUser.value) loadMe()
+    } else {
+      error.value = e.message
+    }
   } finally {
     saving.value = false
   }
@@ -71,6 +81,7 @@ function formatDate(s) {
     </section>
 
     <p v-if="error" class="notice error">{{ error }}</p>
+    <UpgradePrompt v-if="accountsEnabled && personalFull" from="new-page" />
     <div v-if="accountsEnabled && activeTeams.length" class="space-picker">
       <label for="space">Create in</label>
       <select id="space" v-model="space">

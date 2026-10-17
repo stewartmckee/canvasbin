@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/stewartmckee/canvasbin/internal/auth"
+	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/links"
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
@@ -442,18 +443,19 @@ func (s *Server) teamPortal(w http.ResponseWriter, r *http.Request) {
 
 // checkTeamCreate reports why u can't add a page to teamID, if they can't.
 func (s *Server) checkTeamCreate(r *http.Request, u *store.User, teamID int64) error {
+	base := links.Base(s.PublicBaseURL, r)
 	if !u.Verified() {
-		return store.ErrUnverified
+		return config.UnverifiedError(base)
 	}
 	t, err := s.Store.GetTeam(r.Context(), teamID, u.ID)
 	if err != nil {
 		return err
 	}
 	if !t.Active() {
-		return store.ErrTeamInactive
+		return config.TeamInactiveError(base, t.ID)
 	}
 	if t.PageCount >= s.Config.TeamPageQuota() {
-		return store.ErrQuotaExceeded
+		return s.Config.TeamQuotaError()
 	}
 	return nil
 }

@@ -433,15 +433,16 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 
 // checkQuota returns ErrQuotaExceeded if the user can't own another page.
 func (s *Server) checkQuota(r *http.Request, u *store.User) error {
+	base := links.Base(s.PublicBaseURL, r)
 	if !u.Verified() {
-		return store.ErrUnverified
+		return config.UnverifiedError(base)
 	}
 	n, err := s.Store.CountOwned(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
 	if n >= s.Config.Quota(u) {
-		return store.ErrQuotaExceeded
+		return s.Config.QuotaError(u, base)
 	}
 	return nil
 }
