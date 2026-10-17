@@ -1,0 +1,96 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "canvasbin",
+  "version": "1.0.0",
+  "description": "Publish HTML and Markdown pages at shareable links, and keep them up to date.",
+  "author": {
+    "name": "Active Information Design Limited",
+    "email": "support@canvasbin.dev",
+    "url": "https://canvasbin.dev"
+  },
+  "homepage": "https://canvasbin.dev",
+  "repository": "https://github.com/stewartmckee/canvasbin",
+  "license": "MIT",
+  "keywords": ["html", "markdown", "publish", "share", "pages", "dashboards", "reports"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Canvasbin",
+        "shortDescription": "Publish pages at a link",
+        "longDescription": "Canvasbin turns HTML and Markdown into hosted pages with shareable links. Ask ChatGPT to build a dashboard, report, diagram, meeting notes or a one-page site, and it publishes the result to your Canvasbin library. Each page gets a view link, a PDF download and a private edit link.\n\nChatGPT can update a page in place, so the link people already have always shows the latest version. That makes it easy to keep weekly reports, project status pages and family dashboards current without sending a new file every time.\n\nWhat you can do:\n- Publish HTML or Markdown as a hosted page\n- Update or delete pages, and list your library\n- Publish into a shared team space, invite people to a page by email, and discuss team pages in comments\n\nWho it's for: anyone who wants to share something ChatGPT made as a link rather than a file, from developers and analysts to families.\n\nLimitations: you need a Canvasbin account, and team features need a team. Pages are reachable by anyone with the view link, so don't publish anything you wouldn't share that way. Pages are marked not to be indexed by search engines, and scripts in pages run in a sandbox.",
+        "developerName": "Active Information Design Limited",
+        "category": "Productivity",
+        "capabilities": ["Publish pages", "Update pages", "List pages", "Share pages", "Team comments"],
+        "websiteURL": "https://canvasbin.dev",
+        "supportURL": "https://canvasbin.dev/contact",
+        "privacyPolicyURL": "https://canvasbin.dev/privacy",
+        "termsOfServiceURL": "https://canvasbin.dev/terms",
+        "defaultPrompt": [
+          "Turn this into a one-page HTML report and publish it to Canvasbin.",
+          "List my Canvasbin pages.",
+          "Update my Canvasbin dashboard with this week's numbers."
+        ],
+        "brandColor": "#4F46E5",
+        "brandColorDark": "#A5B4FC",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/logo.png"
+      },
+      "onboardingSkill": "./skills/get-started/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "List the user's pages",
+              "prompt": "List my Canvasbin pages.",
+              "tools_triggered": "list_pages",
+              "expected_behavior": "Lists the test account's pages (Weekly sales dashboard, Project kickoff notes, Release checklist and the team's Team roadmap) with their view links."
+            },
+            {
+              "description": "Publish a new HTML page",
+              "prompt": "Make an HTML page comparing three laptops for a student and publish it to Canvasbin.",
+              "tools_triggered": "create_page",
+              "expected_behavior": "Publishes an HTML page and returns its view link and PDF link. The page opens in a browser and shows the comparison."
+            },
+            {
+              "description": "Update an existing page in place",
+              "prompt": "Open my weekly sales dashboard on Canvasbin and add a row for Northern Ireland with £8,400 revenue and 210 orders.",
+              "tools_triggered": "list_pages, get_page, update_page",
+              "expected_behavior": "Reads the dashboard, adds the Northern Ireland row and saves it. The same view link now shows the new row."
+            },
+            {
+              "description": "Publish into a team space",
+              "prompt": "Publish these notes as a Markdown page in my Review Team space: Retro, 17 October. Went well: shipped the portal beta. To improve: earlier QA.",
+              "tools_triggered": "list_teams, create_page",
+              "expected_behavior": "Creates a Markdown page in the Review Team space and returns its view link. The page appears under the team in list_pages."
+            },
+            {
+              "description": "Read and reply to team comments",
+              "prompt": "What comments are on the Team roadmap page? Reply that PDF export can move to October.",
+              "tools_triggered": "list_pages, list_comments, add_comment",
+              "expected_behavior": "Summarises the existing comment about moving PDF export to October, then posts the reply as the signed-in user."
+            }
+          ],
+          "negative": [
+            {
+              "description": "General knowledge question with nothing to publish; Canvasbin should not be called.",
+              "prompt": "What's the capital of Portugal?"
+            },
+            {
+              "description": "Code-only request with no ask to share or publish; ChatGPT should answer in chat without creating a page.",
+              "prompt": "Write a Python function that reverses a string."
+            },
+            {
+              "description": "Request for a different service; Canvasbin should not be used to stand in for Google Drive.",
+              "prompt": "Save this note to my Google Drive: call the dentist on Monday."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "Canvasbin does not sell products or process payments in ChatGPT."
+      },
+      "publication": {
+        "release_notes": "Initial release: publish, read, update, delete and list pages; share pages by email; team spaces and comments."
+      }
+    }
+  }
+}

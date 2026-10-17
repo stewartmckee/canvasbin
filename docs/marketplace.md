@@ -73,6 +73,10 @@ A verified account with a complimentary active plan, three personal pages, an ac
 2. "Write a Python function that reverses a string." (Code only, nothing to publish.)
 3. "Save this note to my Google Drive."
 
+## OpenAI plugin package
+
+OpenAI takes a plugin ZIP. The source is in `plugins/openai/` (manifest, MCP config, onboarding skill); `plugins/openai/build.sh [out.zip]` adds the shared `skills/canvasbin` skill and the icons, then zips it. Bump `version` in `plugin.json` for each upload. The demo video URL and reviewer credentials are entered in the dashboard, not the package.
+
 ## Before submitting
 
 - Test every tool with MCP Inspector (`npx @modelcontextprotocol/inspector`) against `https://canvasbin.dev/mcp`.
