@@ -19,6 +19,7 @@ import {
 import { currentUser, loadMe } from '../auth.js'
 import { describeActivity, formatWhen } from '../activity.js'
 import { site } from '../site.js'
+import { track } from '../analytics.js'
 
 const props = defineProps({ teamId: { type: String, required: true } })
 const route = useRoute()
@@ -70,7 +71,10 @@ async function load() {
 watch(() => props.teamId, load, { immediate: true })
 
 // Stripe's webhook may land just after the redirect back.
-if (route.query.billing === 'success') setTimeout(() => load().then(loadMe), 3000)
+if (route.query.billing === 'success') {
+  track('checkout-complete', { plan: 'team' })
+  setTimeout(() => load().then(loadMe), 3000)
+}
 
 async function act(fn) {
   busy.value = true

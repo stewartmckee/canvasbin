@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import SamplePreview from '../components/SamplePreview.vue'
 import { currentUser } from '../auth.js'
@@ -8,10 +8,6 @@ import { capabilities, findUseCase, schedulers, useCases } from '../usecases.js'
 const props = defineProps({ slug: { type: String, required: true } })
 const uc = computed(() => findUseCase(props.slug))
 const others = computed(() => useCases.filter((u) => u.slug !== props.slug))
-
-onMounted(() => {
-  if (uc.value) document.title = `${uc.value.label} use cases · Canvasbin`
-})
 </script>
 
 <template>

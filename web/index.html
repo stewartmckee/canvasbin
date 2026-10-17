@@ -3,24 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="noindex, nofollow" />
     <meta name="referrer" content="no-referrer" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!--seo:start-->
+    <title>Canvasbin</title>
     <meta
       name="description"
       content="Publish HTML and Markdown pages with a shareable link, a PDF and a private edit link. Works with Claude, ChatGPT and Cursor."
     />
-    <title>Canvasbin</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:site_name" content="Canvasbin" />
+    <meta property="og:title" content="Canvasbin" />
+    <meta property="og:description" content="Share HTML and Markdown pages with a link." />
+    <meta property="og:image" content="https://canvasbin.dev/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!--seo:end-->
     <script>
       // Page keys (read or edit) and page titles must never reach analytics.
+      // Query strings are dropped except campaign tags (tokens live in queries).
       window.canvasbinAnalytics = function (type, payload) {
         var hasKey = /[A-Za-z0-9_-]{43}/
         var redact = function (u) {
           return u ? u.replace(/[A-Za-z0-9_-]{43}/g, '{page}') : u
         }
+        var clean = function (u) {
+          if (!u) return u
+          var q = u.indexOf('?')
+          if (q < 0) return u
+          var kept = u
+            .slice(q + 1)
+            .split('&')
+            .filter(function (p) {
+              return /^(utm_[a-z]+|ref)=/.test(p)
+            })
+          return u.slice(0, q) + (kept.length ? '?' + kept.join('&') : '')
+        }
         if (hasKey.test(payload.url || '')) payload.title = 'Page'
-        payload.url = redact(payload.url)
-        payload.referrer = redact(payload.referrer)
+        payload.url = redact(clean(payload.url))
+        payload.referrer = redact(clean(payload.referrer))
         return payload
       }
     </script>
@@ -29,7 +49,7 @@
       src="https://bucket.mckee.family/script.js"
       data-website-id="bfcdc1d2-7657-48e6-a1b2-ba0b318ed36f"
       data-domains="canvasbin.dev"
-      data-exclude-search="true"
+      data-auto-track="false"
       data-exclude-hash="true"
       data-before-send="canvasbinAnalytics"
     ></script>

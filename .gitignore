@@ -7,5 +7,6 @@ web/dist/*
 .DS_Store
 
 # Personal deployment helpers (LAN hosts). Not part of the public project.
-scripts/
+/scripts/
 docker-compose.prod.yml
+web/dist-ssr/

@@ -1,3 +1,5 @@
+import { track } from './analytics.js'
+
 async function request(method, path, body) {
   const res = await fetch(path, {
     method,
@@ -50,7 +52,10 @@ export const listConnections = () => request('GET', '/api/connections')
 export const revokeConnection = (clientId) => request('POST', '/api/connections/revoke', { client_id: clientId })
 
 // Billing
-export const startCheckout = () => request('POST', '/api/billing/checkout')
+export const startCheckout = () => {
+  track('checkout-start', { plan: 'individual' })
+  return request('POST', '/api/billing/checkout')
+}
 export const openBillingPortal = () => request('POST', '/api/billing/portal')
 
 // Teams
@@ -66,7 +71,10 @@ export const removeTeamMember = (id, userId) => request('DELETE', `${teamPath(id
 export const cancelTeamInvite = (id, inviteId) => request('DELETE', `${teamPath(id)}/invites/${inviteId}`)
 export const getTeamPages = (id) => request('GET', `${teamPath(id)}/pages`)
 export const getTeamActivity = (id) => request('GET', `${teamPath(id)}/activity`)
-export const startTeamCheckout = (id) => request('POST', `${teamPath(id)}/billing/checkout`)
+export const startTeamCheckout = (id) => {
+  track('checkout-start', { plan: 'team' })
+  return request('POST', `${teamPath(id)}/billing/checkout`)
+}
 export const openTeamBillingPortal = (id) => request('POST', `${teamPath(id)}/billing/portal`)
 
 // Comments and activity on team pages

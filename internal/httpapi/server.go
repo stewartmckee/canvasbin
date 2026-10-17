@@ -363,6 +363,13 @@ func (s *Server) view(w http.ResponseWriter, r *http.Request, key string) {
 		http.Error(w, "could not render page", http.StatusInternalServerError)
 		return
 	}
+	if s.accounts() {
+		if show, err := s.Store.ShowsBadge(r.Context(), a.ID); err != nil {
+			slog.Error("badge lookup", "err", err)
+		} else if show {
+			doc = render.WithBadge(doc, links.Base(s.PublicBaseURL, r)+"/?utm_source=badge&utm_medium=referral&utm_campaign=made_with_canvasbin")
+		}
+	}
 	if s.Live != nil && r.URL.Query().Get("live") != "0" {
 		doc = render.WithLiveReload(doc, a.ReadKey, liveTime(a.UpdatedAt))
 	}
@@ -471,6 +478,10 @@ func (s *Server) spa() http.Handler {
 			return
 		}
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if strings.HasPrefix(p, "prerender/") {
+			s.writeIndex(w, r, http.StatusNotFound)
+			return
+		}
 		if p != "" && p != "index.html" {
 			if st, err := fs.Stat(s.Web, p); err == nil && !st.IsDir() {
 				if strings.HasPrefix(p, "assets/") {
@@ -484,22 +495,74 @@ func (s *Server) spa() http.Handler {
 				return
 			}
 		}
+		if !isAppPath(r.URL.Path) {
+			s.writeIndex(w, r, http.StatusNotFound)
+			return
+		}
 		s.serveIndex(w, r)
 	})
 }
 
+// appPaths are the web app's routes besides /{key}; keep in step with
+// web/src/router.js. Anything else gets the app's not-found screen with a 404.
+var appPaths = map[string]bool{
+	"/": true, "/index.html": true, "/new": true, "/login": true, "/register": true,
+	"/forgot-password": true, "/reset-password": true, "/account": true, "/admin": true,
+	"/teams/new": true,
+}
+
+var teamPath = regexp.MustCompile(`^/teams/[0-9]+$`)
+
+func isAppPath(p string) bool {
+	if p != "/" {
+		p = strings.TrimSuffix(p, "/")
+	}
+	if appPaths[p] || teamPath.MatchString(p) {
+		return true
+	}
+	for _, m := range marketingPaths {
+		if p == m {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
+	s.writeIndex(w, r, http.StatusOK)
+}
+
+func (s *Server) writeIndex(w http.ResponseWriter, r *http.Request, status int) {
+	if status == http.StatusOK && s.indexable(r) && s.SessionUser(r) == nil {
+		if page, err := fs.ReadFile(s.Web, prerenderFile(r.URL.Path)); err == nil {
+			writeHTML(w, status, page)
+			return
+		}
+	}
 	index, err := fs.ReadFile(s.Web, "index.html")
 	if err != nil {
 		http.Error(w, "web UI not built", http.StatusNotFound)
 		return
 	}
-	if s.indexable(r) {
+	if status == http.StatusOK && s.indexable(r) {
 		index = bytes.Replace(index, []byte(`content="noindex, nofollow"`), []byte(`content="index, follow"`), 1)
 	}
+	writeHTML(w, status, index)
+}
+
+// prerenderFile is where the web build writes a marketing page's static HTML.
+func prerenderFile(p string) string {
+	if p == "/" {
+		return "prerender/index.html"
+	}
+	return "prerender" + p + ".html"
+}
+
+func writeHTML(w http.ResponseWriter, status int, b []byte) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = w.Write(index)
+	w.WriteHeader(status)
+	_, _ = w.Write(b)
 }
 
 func pathKey(w http.ResponseWriter, r *http.Request) (string, bool) {

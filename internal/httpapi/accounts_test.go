@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -67,7 +68,10 @@ func newEnv(t *testing.T, accounts bool, quota int) *env {
 	cfg := config.Config{Accounts: accounts, FreeQuota: quota, ProQuota: 1000}
 	s := &Server{
 		Store: st, Config: cfg, Mailer: m,
-		Web:  fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
+		Web: fstest.MapFS{
+			"index.html":             {Data: []byte("<html></html>")},
+			"prerender/pricing.html": {Data: []byte("<html>prerendered pricing</html>")},
+		},
 		Live: live.New(100),
 	}
 	ctx, stop := context.WithCancel(context.Background())
@@ -453,6 +457,79 @@ func TestMarketingPagesIndexable(t *testing.T) {
 	off := newEnv(t, false, 20)
 	if r := get(off.srv, "/"); r.Header.Get("X-Robots-Tag") == "" {
 		t.Error("accounts off: home should stay noindex")
+	}
+}
+
+func TestPrerenderedPagesAndNotFound(t *testing.T) {
+	e := newEnv(t, true, 20)
+	body := func(c *client, path string) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequest("GET", e.srv.URL+path, nil)
+		if c.ck != "" {
+			req.AddCookie(&http.Cookie{Name: "canvasbin_session", Value: c.ck})
+		}
+		resp, err := c.c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	anon, user := e.newClient(t), e.newClient(t)
+	user.signup(uniq("prerender"))
+
+	if code, b := body(anon, "/pricing"); code != 200 || b != "<html>prerendered pricing</html>" {
+		t.Errorf("signed out /pricing: %d %q", code, b)
+	}
+	if code, b := body(user, "/pricing"); code != 200 || strings.Contains(b, "prerendered") {
+		t.Errorf("signed in /pricing should get the app shell: %d %q", code, b)
+	}
+	if code, b := body(anon, "/features"); code != 200 || b != "<html></html>" {
+		t.Errorf("no prerender falls back to the shell: %d %q", code, b)
+	}
+	for _, p := range []string{"/login", "/teams/12", "/teams/new", "/use-cases/developers", "/features/"} {
+		if code, _ := body(anon, p); code != 200 {
+			t.Errorf("%s: %d", p, code)
+		}
+	}
+	for _, p := range []string{"/nope", "/teams/abc", "/use-cases/cats", "/prerender/pricing.html", "/features/extra"} {
+		if code, b := body(anon, p); code != 404 || b != "<html></html>" {
+			t.Errorf("%s: %d %q", p, code, b)
+		}
+	}
+}
+
+func TestBadgeOnFreePages(t *testing.T) {
+	e := newEnv(t, true, 20)
+	email := uniq("badge")
+	c := e.newClient(t)
+	c.signup(email)
+	p := c.want(201, "POST", "/api/pages", map[string]string{"title": "b", "format": "html", "content": "<p>hi</p>"})
+	html := func() string {
+		t.Helper()
+		resp, err := http.Get(e.srv.URL + "/" + p["read_key"].(string) + ".html")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b)
+	}
+	if !strings.Contains(html(), "Made with Canvasbin") {
+		t.Fatal("free page should carry the badge")
+	}
+	u, err := e.st.GetUserByEmail(context.Background(), email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.UpdateSubscription(context.Background(), u.ID, store.Subscription{
+		SubscriptionID: fmt.Sprintf("sub_test_%d", time.Now().UnixNano()), Status: "active",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(html(), "Made with Canvasbin") {
+		t.Fatal("paid page should not carry the badge")
 	}
 }
 

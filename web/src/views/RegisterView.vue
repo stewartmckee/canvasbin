@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { register } from '../api.js'
 import { auth, continueAfterSignIn, safeNext } from '../auth.js'
+import { track } from '../analytics.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +23,7 @@ async function submit() {
   error.value = ''
   try {
     auth.me = await register({ email: email.value, password: password.value, display_name: displayName.value })
+    track('signup', { plan: plan === 'pro' ? 'individual' : plan || 'free' })
     if (plan) {
       try {
         if (await continueAfterSignIn(plan, router)) return

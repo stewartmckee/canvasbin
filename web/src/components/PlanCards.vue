@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { startCheckout } from '../api.js'
 import { auth, currentUser, myTeams } from '../auth.js'
 import { site } from '../site.js'
+import { track } from '../analytics.js'
 
 const isPro = computed(() => auth.me?.plan === 'pro')
 const busy = ref(false)
@@ -33,8 +34,11 @@ async function upgrade() {
         <li>Read-only and edit links for every page</li>
         <li>Rendered page, PDF and Markdown downloads</li>
         <li>Publish from Claude, ChatGPT and Cursor</li>
+        <li>Small “Made with Canvasbin” badge on pages</li>
       </ul>
-      <RouterLink v-if="!currentUser" to="/register" class="btn">Get started</RouterLink>
+      <RouterLink v-if="!currentUser" to="/register" class="btn" @click="track('plan-click', { plan: 'free' })">
+        Get started
+      </RouterLink>
       <span v-else-if="!isPro" class="btn ghost" aria-disabled="true">Your current plan</span>
     </article>
     <article class="plan featured">
@@ -46,9 +50,15 @@ async function upgrade() {
       <ul>
         <li>Up to {{ auth.proQuota }} pages</li>
         <li>Everything in Free</li>
+        <li>No Canvasbin badge</li>
         <li>Cancel any time from your account</li>
       </ul>
-      <RouterLink v-if="!currentUser" :to="{ path: '/register', query: { plan: 'pro' } }" class="btn primary">
+      <RouterLink
+        v-if="!currentUser"
+        :to="{ path: '/register', query: { plan: 'pro' } }"
+        class="btn primary"
+        @click="track('plan-click', { plan: 'individual' })"
+      >
         Start with Individual
       </RouterLink>
       <RouterLink v-else-if="isPro" to="/account" class="btn">Manage billing</RouterLink>
@@ -70,8 +80,14 @@ async function upgrade() {
         <li>Comments and a team timeline</li>
         <li>Share pages with people by email</li>
         <li>Owner and admin roles</li>
+        <li>No Canvasbin badge</li>
       </ul>
-      <RouterLink v-if="!currentUser" :to="{ path: '/register', query: { plan: 'team' } }" class="btn">
+      <RouterLink
+        v-if="!currentUser"
+        :to="{ path: '/register', query: { plan: 'team' } }"
+        class="btn"
+        @click="track('plan-click', { plan: 'team' })"
+      >
         Start a team
       </RouterLink>
       <RouterLink v-else-if="myTeams.length" :to="`/teams/${myTeams[0].id}`" class="btn">Your team</RouterLink>

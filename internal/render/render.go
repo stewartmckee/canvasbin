@@ -69,6 +69,22 @@ const liveReloadJS = `(function(){var k=%s,v=%s,d=1000;function go(){var ws;try{
 // readKey changes after version (the page's updated_at as sent by the server).
 func WithLiveReload(doc, readKey, version string) string {
 	tag := `<script data-canvasbin-live>` + fmt.Sprintf(liveReloadJS, strconv.Quote(readKey), strconv.Quote(version)) + `</script>`
+	return beforeBodyEnd(doc, tag)
+}
+
+// The badge resets inherited and page styles inline so user CSS can't restyle
+// or hide it by accident; it stays out of print and PDF output.
+const badgeHTML = `<style>@media print{#canvasbin-badge{display:none!important}}</style>` +
+	`<a id="canvasbin-badge" href="%s" target="_blank" rel="noopener" style="all:initial;position:fixed;right:12px;bottom:12px;z-index:2147483647;display:flex;align-items:center;gap:6px;padding:6px 10px 6px 7px;border-radius:999px;background:#fff;color:#1d2433;border:1px solid #e2e5ee;box-shadow:0 4px 14px rgba(29,36,51,.14);font:600 12px/1 system-ui,-apple-system,'Segoe UI',sans-serif;cursor:pointer;text-decoration:none">` +
+	`<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true" style="all:initial;width:16px;height:16px;display:block"><rect width="32" height="32" rx="7" fill="#4f46e5"/><path d="M9 10h14M9 16h10M9 22h12" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></svg>` +
+	`<span style="all:initial;font:600 12px/1 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1d2433;cursor:pointer">Made with Canvasbin</span></a>`
+
+// WithBadge adds a small "Made with Canvasbin" link in the corner of the page.
+func WithBadge(doc, link string) string {
+	return beforeBodyEnd(doc, fmt.Sprintf(badgeHTML, html.EscapeString(link)))
+}
+
+func beforeBodyEnd(doc, tag string) string {
 	locs := closeBodyRe.FindAllStringIndex(doc, -1)
 	if len(locs) == 0 {
 		return doc + "\n" + tag + "\n"

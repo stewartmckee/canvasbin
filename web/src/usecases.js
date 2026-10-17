@@ -7,6 +7,7 @@ export const useCases = [
   {
     slug: 'developers',
     label: 'Developers',
+    seoTitle: 'Agent-built dashboards, diagrams and digests for developers',
     icon: '⚙️',
     eyebrow: 'For developers and engineering teams',
     title: 'Dashboards, diagrams and digests your agent keeps up to date.',
@@ -51,6 +52,7 @@ export const useCases = [
   {
     slug: 'business',
     label: 'Business',
+    seoTitle: 'Self-updating reports and dashboards for business',
     icon: '📈',
     eyebrow: 'For founders, operators and client teams',
     title: 'Reports that build themselves and never go stale.',
@@ -95,6 +97,7 @@ export const useCases = [
   {
     slug: 'family',
     label: 'Family & hobbies',
+    seoTitle: 'Family dashboards your AI keeps up to date',
     icon: '🏃',
     eyebrow: 'For families, clubs and hobbies',
     title: 'A family dashboard that updates itself every Sunday.',

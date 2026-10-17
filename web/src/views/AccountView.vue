@@ -4,9 +4,11 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import McpConnect from '../components/McpConnect.vue'
 import { listConnections, openBillingPortal, revokeConnection, startCheckout } from '../api.js'
 import { auth, currentUser, isAdmin, logout, myTeams } from '../auth.js'
+import { track } from '../analytics.js'
 
 const route = useRoute()
 const router = useRouter()
+if (route.query.billing === 'success') track('checkout-complete', { plan: 'individual' })
 const busy = ref(false)
 const error = ref('')
 
