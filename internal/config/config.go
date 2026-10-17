@@ -36,6 +36,10 @@ type Config struct {
 
 	AdminEmails []string
 
+	// OpenAIAppsChallenge is the domain-verification token the OpenAI
+	// platform asks for, served at /.well-known/openai-apps-challenge.
+	OpenAIAppsChallenge string
+
 	FreeQuota int
 	ProQuota  int
 	TeamQuota int
@@ -65,6 +69,7 @@ func fromGetenv(get func(string) string) Config {
 		StripePriceTeamBase:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_BASE")),
 		StripePriceTeamSeat:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_SEAT")),
 		StripePublishableKey: strings.TrimSpace(get("STRIPE_PUBLISHABLE_KEY")),
+		OpenAIAppsChallenge:  strings.TrimSpace(get("OPENAI_APPS_CHALLENGE")),
 		FreeQuota:            FreeQuota,
 		ProQuota:             ProQuota,
 		TeamQuota:            TeamQuota,

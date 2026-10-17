@@ -1,14 +1,17 @@
 <script setup>
 import { computed, ref } from 'vue'
 import CopyField from './CopyField.vue'
+import { site } from '../site.js'
 
 const props = defineProps({
   // With accounts on the connector signs in with OAuth; otherwise it is open.
   oauth: { type: Boolean, default: true },
+  // Client tab ids to show, in order; all of them when empty.
+  only: { type: Array, default: () => [] },
 })
 
 const name = 'canvasbin'
-const url = `${window.location.origin}/mcp`
+const url = `${import.meta.env.SSR ? site.url : window.location.origin}/mcp`
 const json = (v) => JSON.stringify(v, null, 2)
 
 const cursorLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=${name}&config=${btoa(JSON.stringify({ url }))}`
@@ -16,7 +19,7 @@ const vscodeConfig = encodeURIComponent(JSON.stringify({ name, type: 'http', url
 const vscodeLink = `vscode:mcp/install?${vscodeConfig}`
 const vscodeInsidersLink = `vscode-insiders:mcp/install?${vscodeConfig}`
 
-const clients = [
+const allClients = [
   { id: 'cursor', label: 'Cursor' },
   { id: 'vscode', label: 'VS Code' },
   { id: 'claude-code', label: 'Claude Code' },
@@ -27,7 +30,8 @@ const clients = [
   { id: 'windsurf', label: 'Windsurf' },
   { id: 'other', label: 'Other' },
 ]
-const tab = ref('cursor')
+const clients = props.only.length ? props.only.map((id) => allClients.find((c) => c.id === id)) : allClients
+const tab = ref(clients[0].id)
 
 const signInNote = computed(() =>
   props.oauth ? 'The first time it publishes a page, your assistant asks you to sign in to Canvasbin.' : '',

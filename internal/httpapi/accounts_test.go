@@ -488,12 +488,25 @@ func TestPrerenderedPagesAndNotFound(t *testing.T) {
 	if code, b := body(anon, "/features"); code != 200 || b != "<html></html>" {
 		t.Errorf("no prerender falls back to the shell: %d %q", code, b)
 	}
-	for _, p := range []string{"/login", "/teams/12", "/teams/new", "/use-cases/developers", "/features/"} {
+	for _, p := range []string{"/login", "/teams/12", "/teams/new", "/use-cases/developers", "/connect/claude"} {
 		if code, _ := body(anon, p); code != 200 {
 			t.Errorf("%s: %d", p, code)
 		}
 	}
-	for _, p := range []string{"/nope", "/teams/abc", "/use-cases/cats", "/prerender/pricing.html", "/features/extra"} {
+	for from, to := range map[string]string{
+		"/features/": "/features", "/use-cases/family/": "/use-cases/family", "/index.html": "/",
+		"/pricing/?utm_source=x": "/pricing?utm_source=x",
+	} {
+		resp, err := anon.c.Get(e.srv.URL + from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusMovedPermanently || resp.Header.Get("Location") != to {
+			t.Errorf("%s: %d -> %q, want 301 -> %q", from, resp.StatusCode, resp.Header.Get("Location"), to)
+		}
+	}
+	for _, p := range []string{"/nope", "/teams/abc", "/use-cases/cats", "/prerender/pricing.html", "/features/extra", "/evil.example/"} {
 		if code, b := body(anon, p); code != 404 || b != "<html></html>" {
 			t.Errorf("%s: %d %q", p, code, b)
 		}

@@ -14,15 +14,23 @@ const year = new Date().getFullYear()
           <img src="/favicon.svg" alt="" width="22" height="22" />
           <span>{{ site.name }}</span>
         </RouterLink>
-        <p class="muted small">Pages you can share with a link.</p>
+        <p class="muted small">HTML and Markdown pages, shared with a link.</p>
       </div>
       <nav class="footer-cols" aria-label="Footer">
         <div>
           <h4>Product</h4>
           <RouterLink to="/features">Features</RouterLink>
           <RouterLink to="/pricing">Pricing</RouterLink>
+          <RouterLink to="/use-cases">Use cases</RouterLink>
           <RouterLink v-if="!currentUser" to="/login">Sign in</RouterLink>
           <RouterLink v-else to="/account">Account</RouterLink>
+        </div>
+        <div>
+          <h4>Connect your AI</h4>
+          <RouterLink to="/connect/claude">Claude</RouterLink>
+          <RouterLink to="/connect/chatgpt">ChatGPT</RouterLink>
+          <RouterLink to="/connect/cursor">Cursor</RouterLink>
+          <RouterLink to="/connect">All clients</RouterLink>
         </div>
         <div>
           <h4>Use cases</h4>

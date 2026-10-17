@@ -43,6 +43,8 @@ type Server struct {
 	PDFLimit      *ratelimit.Limiter
 	// SelfURL is how the PDF renderer reaches this server, e.g. http://127.0.0.1:8080.
 	SelfURL string
+	// Version is the build version; deploys stamp it as YYYYMMDD-HHMMSS.
+	Version string
 	// Live, when set, pushes page changes to open browsers (see RunLive).
 	Live *live.Hub
 
@@ -81,6 +83,12 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /robots.txt", s.robots)
 		mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 	}
+	if token := s.Config.OpenAIAppsChallenge; token != "" {
+		mux.HandleFunc("GET /.well-known/openai-apps-challenge", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte(token))
+		})
+	}
 	mux.HandleFunc("GET /raw/{key}", s.raw)
 	mux.HandleFunc("GET /v/{key}", redirectTo(".html"))
 	mux.HandleFunc("GET /e/{key}", redirectTo(""))
@@ -117,6 +125,7 @@ func (s *Server) Handler() http.Handler {
 var marketingPaths = []string{
 	"/", "/features", "/pricing", "/privacy", "/terms", "/contact",
 	"/use-cases", "/use-cases/developers", "/use-cases/business", "/use-cases/family",
+	"/connect", "/connect/claude", "/connect/chatgpt", "/connect/cursor",
 }
 
 func (s *Server) indexable(r *http.Request) bool {
@@ -142,11 +151,27 @@ func (s *Server) sitemap(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	lastmod := ""
+	if d := releaseDate(s.Version); d != "" {
+		lastmod = "<lastmod>" + d + "</lastmod>"
+	}
 	for _, p := range marketingPaths {
-		fmt.Fprintf(&b, "  <url><loc>%s%s</loc></url>\n", base, p)
+		fmt.Fprintf(&b, "  <url><loc>%s%s</loc>%s</url>\n", base, p, lastmod)
 	}
 	b.WriteString("</urlset>\n")
 	_, _ = w.Write([]byte(b.String()))
+}
+
+var versionDate = regexp.MustCompile(`^(\d{4})(\d{2})(\d{2})-\d{6}$`)
+
+// releaseDate turns a deploy version into a sitemap date (YYYY-MM-DD), or ""
+// for local builds.
+func releaseDate(version string) string {
+	m := versionDate.FindStringSubmatch(version)
+	if m == nil {
+		return ""
+	}
+	return m[1] + "-" + m[2] + "-" + m[3]
 }
 
 // redirectTo keeps the original /v/{key} and /e/{key} links working.
@@ -477,6 +502,13 @@ func (s *Server) spa() http.Handler {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
+		if to := canonicalPath(r.URL.Path); to != "" {
+			if r.URL.RawQuery != "" {
+				to += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, to, http.StatusMovedPermanently)
+			return
+		}
 		p := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 		if strings.HasPrefix(p, "prerender/") {
 			s.writeIndex(w, r, http.StatusNotFound)
@@ -512,6 +544,20 @@ var appPaths = map[string]bool{
 }
 
 var teamPath = regexp.MustCompile(`^/teams/[0-9]+$`)
+
+// canonicalPath returns where a duplicate URL for an app route should
+// redirect (trailing slash, /index.html), or "" if p is already canonical.
+func canonicalPath(p string) string {
+	if p == "/index.html" {
+		return "/"
+	}
+	if len(p) > 1 && strings.HasSuffix(p, "/") {
+		if t := strings.TrimRight(p, "/"); t != "" && isAppPath(t) {
+			return t
+		}
+	}
+	return ""
+}
 
 func isAppPath(p string) bool {
 	if p != "/" {

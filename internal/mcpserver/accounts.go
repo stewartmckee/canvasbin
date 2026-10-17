@@ -29,7 +29,7 @@ create_page publishes into the user's own library and counts toward their page q
 - unshare_page: remove someone's access.
 - list_comments / add_comment: read and post comments on a team page. Team members only.
 
-If create_page or claim_page fails because the page quota is full, pass the error's options (upgrade link or deleting a page) on to the user. Never delete their pages to make room unless they ask you to.
+When the page quota is full, create_page and claim_page return an error that explains the user's options. Only delete pages to make room if the user asks.
 
 ` + pageInstructions
 
@@ -81,43 +81,44 @@ func (t *tools) addAccountTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_pages",
 		Title:       "List my pages",
-		Description: "List the pages the signed-in user owns or that were shared with them, newest first. Requires sign-in.",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		Description: "List the pages the signed-in user owns, that were shared with them, or that belong to their teams, newest first, with each page's links. Requires sign-in.",
+		Annotations: readTool(),
 	}, t.list)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "claim_page",
 		Title:       "Claim page",
 		Description: "Attach an anonymous page to the signed-in user's library using its write key. Counts toward their quota. Requires sign-in.",
-		Annotations: &mcp.ToolAnnotations{IdempotentHint: true},
+		Annotations: writeTool(false, true, false),
 	}, t.claim)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "share_page",
 		Title:       "Share page",
 		Description: "Give someone access to a page you own, by email, as viewer or editor. People without an account get an invitation that applies when they sign up. Requires sign-in.",
-		Annotations: &mcp.ToolAnnotations{IdempotentHint: true},
+		Annotations: writeTool(true, true, true),
 	}, t.share)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "unshare_page",
 		Title:       "Unshare page",
 		Description: "Remove someone's access (or pending invitation) from a page you own. Requires sign-in.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), IdempotentHint: true},
+		Annotations: writeTool(true, true, false),
 	}, t.unshare)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_teams",
 		Title:       "List my teams",
 		Description: "List the teams the signed-in user belongs to, with their role, whether the team plan is active, and page counts. Use a team's name or id as create_page's team argument.",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		Annotations: readTool(),
 	}, t.listTeams)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_comments",
 		Title:       "List comments",
 		Description: "Read the comment thread on a team page, oldest first. Team members only.",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		Annotations: readTool(),
 	}, t.listComments)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "add_comment",
 		Title:       "Add comment",
 		Description: "Post a comment on a team page as the signed-in user. Team members only; comments are never shown to people viewing by link.",
+		Annotations: writeTool(false, false, false),
 	}, t.addComment)
 }
 

@@ -17,26 +17,32 @@ const notice = computed(
 const features = [
   {
     title: 'Two links for every page',
+    to: '/features#share',
     body: 'A read-only link for your audience and a private edit link for you and your collaborators.',
   },
   {
     title: 'HTML or Markdown',
+    to: '/features#write',
     body: 'Write visually or in source. Every page is a fast web page and a one-click PDF download.',
   },
   {
     title: 'Built for AI agents',
-    body: 'Claude, ChatGPT and Cursor can publish and update pages for you. Sign in once and they just work.',
+    to: '/connect',
+    body: 'Claude, ChatGPT and Cursor publish and update pages through the Canvasbin MCP server. Sign in once and they just work.',
   },
   {
     title: 'Live updates',
+    to: '/features#share',
     body: 'Edit a page, or let your agent update it, and everyone viewing it sees the change instantly. No reloading needed.',
   },
   {
     title: 'Share with people',
+    to: '/pricing#plans',
     body: 'Invite people by email as viewers or editors. Everything you own and everything shared with you, in one library.',
   },
   {
     title: 'Private by default',
+    to: '/features#safety',
     body: 'Unguessable links, pages kept out of search engines, and scripts in your pages run in a locked-down sandbox.',
   },
 ]
@@ -46,11 +52,12 @@ const features = [
   <div class="landing">
     <p v-if="notice" class="notice">{{ notice }}</p>
     <section class="hero">
-      <p class="eyebrow">HTML and Markdown pages, shared with a link</p>
-      <h1>Turn anything you write — or your AI writes — into a page you can share.</h1>
+      <p class="eyebrow">HTML and Markdown hosting for people and AI agents</p>
+      <h1>Turn HTML and Markdown — yours or your AI’s — into a page you can share.</h1>
       <p class="lead">
-        Canvasbin gives every page a beautiful web view, a PDF and a private edit link. Reports, notes, prototypes,
-        dashboards: publish them in seconds and keep them up to date.
+        Canvasbin hosts every page at a shareable link, with a PDF and a private edit link. Connect the Canvasbin MCP
+        server and Claude, ChatGPT or Cursor publish reports, dashboards and prototypes for you, and keep them up to
+        date.
       </p>
       <div class="hero-actions">
         <RouterLink to="/register" class="btn primary large">Get started free</RouterLink>
@@ -75,7 +82,7 @@ const features = [
       </div>
     </section>
 
-    <section class="section">
+    <section id="how-it-works" class="section">
       <h2 class="section-title">How it works</h2>
       <ol class="steps">
         <li>
@@ -93,29 +100,34 @@ const features = [
       </ol>
     </section>
 
-    <section class="section">
+    <section id="features" class="section">
       <h2 class="section-title">Everything you need to share a page</h2>
       <div class="feature-grid">
         <article v-for="f in features" :key="f.title" class="feature">
-          <h3>{{ f.title }}</h3>
+          <h3><RouterLink :to="f.to">{{ f.title }}</RouterLink></h3>
           <p class="muted">{{ f.body }}</p>
         </article>
       </div>
       <p class="center"><RouterLink to="/features">Explore all features →</RouterLink></p>
     </section>
 
-    <section class="section band">
+    <section id="ai" class="section band">
       <div>
         <h2>Let your AI publish for you</h2>
         <p class="muted">
           Ask Claude, ChatGPT or Cursor to turn its answer into a page, and you get a link back — ready to send. Your
           agent can update the page later, and everything it publishes lands in your library.
         </p>
+        <p class="related-links">
+          <RouterLink to="/connect/claude">Canvasbin for Claude</RouterLink>
+          <RouterLink to="/connect/chatgpt">Canvasbin for ChatGPT</RouterLink>
+          <RouterLink to="/connect/cursor">Canvasbin for Cursor</RouterLink>
+        </p>
       </div>
-      <RouterLink to="/register" class="btn primary">Connect your AI</RouterLink>
+      <RouterLink to="/connect" class="btn primary">Connect your AI</RouterLink>
     </section>
 
-    <section class="section">
+    <section id="use-cases" class="section">
       <h2 class="section-title">Pages that keep themselves up to date</h2>
       <div class="usecase-cards">
         <RouterLink v-for="u in useCases" :key="u.slug" :to="`/use-cases/${u.slug}`" class="usecase-card">
@@ -127,9 +139,10 @@ const features = [
       </div>
     </section>
 
-    <section class="section">
+    <section id="pricing" class="section">
       <h2 class="section-title">Simple pricing</h2>
       <PlanCards />
+      <p class="center"><RouterLink to="/pricing#faq">Pricing questions answered →</RouterLink></p>
     </section>
 
     <section class="section cta">

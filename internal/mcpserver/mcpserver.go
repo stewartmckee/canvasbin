@@ -90,32 +90,42 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	if o.Config.Accounts {
 		text = accountInstructions
 	}
-	s := mcp.NewServer(&mcp.Implementation{Name: "canvasbin", Title: "Canvasbin", Version: o.Version},
-		&mcp.ServerOptions{Instructions: text})
+	s := mcp.NewServer(&mcp.Implementation{
+		Name:        "canvasbin",
+		Title:       "Canvasbin",
+		Description: "Publish HTML and Markdown pages at shareable links, and keep them up to date.",
+		Version:     o.Version,
+		WebsiteURL:  base,
+		Icons: []mcp.Icon{
+			{Source: base + "/favicon.svg", MIMEType: "image/svg+xml", Sizes: []string{"any"}},
+			{Source: base + "/icon-512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},
+		},
+	}, &mcp.ServerOptions{Instructions: text})
 	t := &tools{Options: o, base: base, clientIP: clientIP, user: user}
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_page",
 		Title:       "Create page",
 		Description: "Publish a new HTML or Markdown page. Returns html_url (rendered, view-only), pdf_url, read_url (read-only app view) and write_url (browser editor), plus the keys.",
+		Annotations: writeTool(false, false, false),
 	}, t.create)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_page",
 		Title:       "Get page",
 		Description: "Fetch a page's title, format and source content using its read key, write key, or either URL.",
-		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true},
+		Annotations: readTool(),
 	}, t.get)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "update_page",
 		Title:       "Update page",
 		Description: "Edit a page directly: change its content, title or format. Requires the write key or write URL. Omitted fields are left unchanged; content replaces the whole page. Changes are live on the page URLs immediately.",
-		Annotations: &mcp.ToolAnnotations{IdempotentHint: true},
+		Annotations: writeTool(true, true, false),
 	}, t.update)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "delete_page",
 		Title:       "Delete page",
 		Description: "Permanently delete a page. Requires the write key or write URL. Both links stop working.",
-		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), IdempotentHint: true},
+		Annotations: writeTool(true, true, false),
 	}, t.remove)
 	if o.Config.Accounts {
 		t.addAccountTools(s)
@@ -274,3 +284,13 @@ func (t *tools) remove(ctx context.Context, _ *mcp.CallToolRequest, in DeleteInp
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// Tool annotations. Directories require every hint to be explicit. Tools stay
+// within Canvasbin (openWorld false) except sharing, which emails anyone.
+func readTool() *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{ReadOnlyHint: true, DestructiveHint: ptr(false), IdempotentHint: true, OpenWorldHint: ptr(false)}
+}
+
+func writeTool(destructive, idempotent, openWorld bool) *mcp.ToolAnnotations {
+	return &mcp.ToolAnnotations{DestructiveHint: ptr(destructive), IdempotentHint: idempotent, OpenWorldHint: ptr(openWorld)}
+}

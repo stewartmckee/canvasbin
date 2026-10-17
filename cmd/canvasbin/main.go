@@ -60,6 +60,7 @@ func run() error {
 		PDF:           pdf.New(2),
 		PDFLimit:      ratelimit.New(20, 10*time.Minute),
 		SelfURL:       selfURL(addr),
+		Version:       version,
 		Config:        cfg,
 		Live:          live.New(10000),
 	}

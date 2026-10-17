@@ -7,7 +7,9 @@ export const useCases = [
   {
     slug: 'developers',
     label: 'Developers',
-    seoTitle: 'Agent-built dashboards, diagrams and digests for developers',
+    seoTitle: 'AI-built dashboards and diagrams for developers',
+    seoDescription:
+      'Release health dashboards, architecture diagrams and weekly engineering digests that your AI agent builds from your repos and keeps up to date at one link.',
     icon: '⚙️',
     eyebrow: 'For developers and engineering teams',
     title: 'Dashboards, diagrams and digests your agent keeps up to date.',
@@ -53,6 +55,8 @@ export const useCases = [
     slug: 'business',
     label: 'Business',
     seoTitle: 'Self-updating reports and dashboards for business',
+    seoDescription:
+      'Sales pipelines, support dashboards and client status pages that your AI agent rebuilds from your CRM, helpdesk and project tools on a schedule.',
     icon: '📈',
     eyebrow: 'For founders, operators and client teams',
     title: 'Reports that build themselves and never go stale.',
@@ -98,6 +102,8 @@ export const useCases = [
     slug: 'family',
     label: 'Family & hobbies',
     seoTitle: 'Family dashboards your AI keeps up to date',
+    seoDescription:
+      'A junior parkrun dashboard rebuilt from result emails every Sunday, plus ideas for club tables, holiday planners and chore boards your AI keeps current.',
     icon: '🏃',
     eyebrow: 'For families, clubs and hobbies',
     title: 'A family dashboard that updates itself every Sunday.',

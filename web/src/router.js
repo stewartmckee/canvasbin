@@ -18,6 +18,7 @@ import PrivacyView from './views/PrivacyView.vue'
 import TermsView from './views/TermsView.vue'
 import UseCasesView from './views/UseCasesView.vue'
 import UseCaseView from './views/UseCaseView.vue'
+import ConnectView from './views/ConnectView.vue'
 import { auth, currentUser, initAuth, isAdmin } from './auth.js'
 import { applySeo } from './seo.js'
 import { pageview } from './analytics.js'
@@ -34,6 +35,14 @@ const routes = [
     path: '/use-cases/:slug(developers|business|family)',
     name: 'use-case',
     component: UseCaseView,
+    props: true,
+    meta: { accounts: true },
+  },
+  { path: '/connect', name: 'connect', component: ConnectView, meta: marketing('Connect your AI') },
+  {
+    path: '/connect/:slug(claude|chatgpt|cursor)',
+    name: 'connect-assistant',
+    component: ConnectView,
     props: true,
     meta: { accounts: true },
   },

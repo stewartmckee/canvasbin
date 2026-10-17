@@ -18,7 +18,7 @@ const highlights = useCases.map((u) => ({ ...u.samples[0], slug: u.slug, label: 
       </p>
       <div class="hero-actions">
         <RouterLink v-if="!currentUser" to="/register" class="btn primary large">Get started free</RouterLink>
-        <RouterLink v-else to="/account" class="btn primary large">Connect your AI</RouterLink>
+        <RouterLink v-else to="/connect" class="btn primary large">Connect your AI</RouterLink>
       </div>
     </section>
 
@@ -60,7 +60,7 @@ const highlights = useCases.map((u) => ({ ...u.samples[0], slug: u.slug, label: 
           <li v-for="[title, body] in schedulers" :key="title"><strong>{{ title }}.</strong> {{ body }}</li>
         </ul>
       </div>
-      <RouterLink :to="currentUser ? '/account' : '/register'" class="btn primary">Connect your AI</RouterLink>
+      <RouterLink to="/connect" class="btn primary">Connect your AI</RouterLink>
     </section>
   </div>
 </template>

@@ -1,38 +1,59 @@
+import { assistants, connectHub } from './connect.js'
 import { offers, pricingFaqs } from './pricing.js'
 import { site } from './site.js'
 import { useCases } from './usecases.js'
 
 // Search and social metadata for the public marketing pages. The prerender
 // build writes these into each page's <head>; the app updates them on navigation.
+// `crumbs` (parent pages) feed the BreadcrumbList; `faqs` the FAQPage.
 const pages = {
   '/': {
-    title: 'Canvasbin — share HTML and Markdown pages with a link',
+    title: 'Canvasbin — publish HTML pages from Claude, ChatGPT and Cursor',
     description:
-      'Publish HTML and Markdown pages with a shareable link, a PDF and a private edit link. Let Claude, ChatGPT or Cursor publish and update them for you, live.',
+      'Host and share HTML and Markdown pages at a link, with a PDF and an edit link. Connect the Canvasbin MCP server and your AI publishes and updates them for you.',
   },
   '/features': {
-    title: 'Features · Canvasbin',
+    title: 'Features: HTML and Markdown hosting, PDFs and MCP · Canvasbin',
     description:
-      'Visual and source editors, read-only and edit links, PDF downloads, live updates, email sharing and publishing from Claude, ChatGPT and Cursor.',
+      'Visual and source editors, shareable read-only and edit links, PDF export, live updates, email sharing, and an MCP server for Claude, ChatGPT and Cursor.',
   },
   '/pricing': {
-    title: 'Pricing · Canvasbin',
-    description: `Free for up to 5 pages. Individual is ${site.proPrice} a month for 100 pages. Team is ${site.teamBasePrice} a month plus ${site.teamSeatPrice} per user, with shared pages, comments and a timeline.`,
+    title: 'Pricing: free HTML hosting, Individual and Team plans · Canvasbin',
+    description: `Host up to 5 HTML or Markdown pages free. Individual is ${site.proPrice} a month for 100 pages. Team is ${site.teamBasePrice} a month plus ${site.teamSeatPrice} per user, with shared pages and comments.`,
   },
   '/use-cases': {
     title: 'Use cases: living pages built by AI agents · Canvasbin',
     description:
       'Dashboards, reports and diagrams that your AI agent builds and keeps up to date on a schedule. See live examples for developers, business and families.',
   },
+  '/connect': { title: connectHub.seoTitle, description: connectHub.seoDescription, faqs: connectHub.faqs },
   '/contact': {
     title: 'Contact · Canvasbin',
-    description: 'Get in touch with the Canvasbin team about support, billing or partnerships.',
+    description: 'Get in touch with the Canvasbin team about support, billing, partnerships or reporting a page.',
   },
-  '/privacy': { title: 'Privacy policy · Canvasbin', description: 'How Canvasbin collects, uses and protects your data.' },
-  '/terms': { title: 'Terms of service · Canvasbin', description: 'The terms for using Canvasbin.' },
+  '/privacy': {
+    title: 'Privacy policy · Canvasbin',
+    description: 'What Canvasbin collects, why, who we share it with, how long we keep it, and the controls you have over your data.',
+  },
+  '/terms': {
+    title: 'Terms of service · Canvasbin',
+    description: 'The terms for using Canvasbin: your account, your content, acceptable use, plans and billing.',
+  },
 }
 for (const u of useCases) {
-  pages[`/use-cases/${u.slug}`] = { title: `${u.seoTitle} · Canvasbin`, description: u.summary }
+  pages[`/use-cases/${u.slug}`] = {
+    title: `${u.seoTitle} · Canvasbin`,
+    description: u.seoDescription,
+    crumbs: [['Use cases', '/use-cases'], [u.label]],
+  }
+}
+for (const a of assistants) {
+  pages[`/connect/${a.slug}`] = {
+    title: a.seoTitle,
+    description: a.seoDescription,
+    faqs: a.faqs,
+    crumbs: [['Connect your AI', '/connect'], [a.label]],
+  }
 }
 
 export const marketingPaths = Object.keys(pages)
@@ -44,9 +65,32 @@ function meta(path) {
   return p && { ...p, url: site.url + (path === '/' ? '/' : path) }
 }
 
+const ctx = 'https://schema.org'
+
+const faqPage = (faqs) => ({
+  '@context': ctx,
+  '@type': 'FAQPage',
+  mainEntity: faqs.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+})
+
+function breadcrumbs(path, crumbs) {
+  const items = [['Home', '/'], ...crumbs.slice(0, -1), [crumbs[crumbs.length - 1][0], path]]
+  return {
+    '@context': ctx,
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map(([name, p], i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name,
+      item: site.url + (p === '/' ? '/' : p),
+    })),
+  }
+}
+
 function structuredData(path, quotas) {
+  const p = pages[path]
   const app = {
-    '@context': 'https://schema.org',
+    '@context': ctx,
     '@type': 'SoftwareApplication',
     name: site.name,
     url: `${site.url}/`,
@@ -56,24 +100,18 @@ function structuredData(path, quotas) {
     image,
     offers: offers(quotas),
   }
+  const out = []
   if (path === '/') {
-    return [app, { '@context': 'https://schema.org', '@type': 'Organization', name: site.name, url: `${site.url}/`, logo: `${site.url}/favicon.svg` }]
-  }
-  if (path === '/pricing') {
-    return [
+    out.push(
       app,
-      {
-        '@context': 'https://schema.org',
-        '@type': 'FAQPage',
-        mainEntity: pricingFaqs(quotas.freeQuota).map(([q, a]) => ({
-          '@type': 'Question',
-          name: q,
-          acceptedAnswer: { '@type': 'Answer', text: a },
-        })),
-      },
-    ]
+      { '@context': ctx, '@type': 'Organization', name: site.name, url: `${site.url}/`, logo: `${site.url}/icon-512.png` },
+      { '@context': ctx, '@type': 'WebSite', name: site.name, url: `${site.url}/` },
+    )
   }
-  return []
+  if (path === '/pricing') out.push(app, faqPage(pricingFaqs(quotas.freeQuota)))
+  if (p.faqs) out.push(faqPage(p.faqs))
+  if (p.crumbs) out.push(breadcrumbs(path, p.crumbs))
+  return out
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -88,6 +126,7 @@ export function headTags(path, quotas) {
     `<link rel="canonical" href="${esc(m.url)}" />`,
     `<meta property="og:type" content="website" />`,
     `<meta property="og:site_name" content="${site.name}" />`,
+    `<meta property="og:locale" content="en_GB" />`,
     `<meta property="og:title" content="${esc(m.title)}" />`,
     `<meta property="og:description" content="${esc(m.description)}" />`,
     `<meta property="og:url" content="${esc(m.url)}" />`,

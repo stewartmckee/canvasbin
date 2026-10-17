@@ -5,7 +5,7 @@ import { site } from '../site.js'
 <template>
   <div class="marketing legal">
     <h1>Privacy policy</h1>
-    <p class="muted small">Last updated 15 October 2026</p>
+    <p class="muted small">Last updated 17 October 2026</p>
     <p>
       {{ site.name }} is operated by {{ site.operator }} (“we”, “us”). This policy explains what we collect when you use
       {{ site.name }}, why, and the choices you have.
@@ -24,7 +24,22 @@ import { site } from '../site.js'
         granted it. You can disconnect an app at any time from your account page.
       </li>
       <li><strong>Technical logs:</strong> request logs used to keep the service running and secure. Page links are removed from logs.</li>
+      <li>
+        <strong>Usage statistics:</strong> privacy-friendly, cookieless analytics that we host ourselves (Umami) count
+        visits to our own screens and a few actions such as sign-ups. Page links, page titles and page content are
+        stripped before anything is recorded.
+      </li>
     </ul>
+
+    <h2>AI assistants (MCP)</h2>
+    <p>
+      When you connect Claude, ChatGPT, Cursor or another assistant to {{ site.name }}, it can only use the tools you
+      approve during sign-in, and only on pages you own, pages shared with you and your teams’ pages. We receive just
+      what the assistant sends in each tool call, such as a page’s title and content or an email address you ask it to
+      share with. We never receive your conversation with the assistant. That data is used only to carry out the
+      request and is handled like everything else in this policy. You can revoke an assistant’s access at any time
+      from your account page.
+    </p>
 
     <h2>How we use it</h2>
     <p>
