@@ -33,6 +33,23 @@ func TestSendVerify(t *testing.T) {
 	}
 }
 
+func TestSendWelcome(t *testing.T) {
+	var text, subject string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		text, subject = r.PostForm.Get("text"), r.PostForm.Get("subject")
+	}))
+	defer srv.Close()
+	c := New("k", "example.dev", "x <x@example.dev>")
+	c.BaseURL = srv.URL
+	if err := c.SendWelcome(context.Background(), "a@b.com", "https://canvasbin.test"); err != nil {
+		t.Fatal(err)
+	}
+	if subject == "" || !strings.Contains(text, "https://canvasbin.test/connect") || !strings.Contains(text, "https://canvasbin.test/new") {
+		t.Fatalf("subject %q text %q", subject, text)
+	}
+}
+
 func TestErrorsDoNotLeakKey(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", 401)

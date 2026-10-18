@@ -40,6 +40,10 @@ type Config struct {
 	// platform asks for, served at /.well-known/openai-apps-challenge.
 	OpenAIAppsChallenge string
 
+	// UmamiURL and UmamiWebsiteID enable server-side analytics events.
+	UmamiURL       string
+	UmamiWebsiteID string
+
 	FreeQuota int
 	ProQuota  int
 	TeamQuota int
@@ -70,6 +74,8 @@ func fromGetenv(get func(string) string) Config {
 		StripePriceTeamSeat:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_SEAT")),
 		StripePublishableKey: strings.TrimSpace(get("STRIPE_PUBLISHABLE_KEY")),
 		OpenAIAppsChallenge:  strings.TrimSpace(get("OPENAI_APPS_CHALLENGE")),
+		UmamiURL:             strings.TrimSpace(get("UMAMI_URL")),
+		UmamiWebsiteID:       strings.TrimSpace(get("UMAMI_WEBSITE_ID")),
 		FreeQuota:            FreeQuota,
 		ProQuota:             ProQuota,
 		TeamQuota:            TeamQuota,

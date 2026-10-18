@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stewartmckee/canvasbin/internal/analytics"
 	"github.com/stewartmckee/canvasbin/internal/billing"
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/httpapi"
@@ -63,10 +64,12 @@ func run() error {
 		Version:       version,
 		Config:        cfg,
 		Live:          live.New(10000),
+		Analytics:     analytics.New(cfg.UmamiURL, cfg.UmamiWebsiteID, base),
 	}
 	go srv.RunLive(ctx)
 	mcpOpts := mcpserver.Options{
 		Store: st, PublicBaseURL: base, CreateLimit: limiter, Version: version, Config: cfg,
+		Analytics: srv.Analytics,
 	}
 	if cfg.Accounts {
 		srv.Mailer = mail.New(cfg.MailgunKey, cfg.MailgunDomain, cfg.MailFrom)

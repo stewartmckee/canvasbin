@@ -16,6 +16,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/stewartmckee/canvasbin/internal/auth"
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/live"
 	"github.com/stewartmckee/canvasbin/internal/store"
@@ -45,6 +46,10 @@ func (f *fakeMailer) SendInvite(_ context.Context, e, l, _ string) error {
 
 func (f *fakeMailer) SendTeamInvite(_ context.Context, e, l, _, _ string) error {
 	return f.put("team", e, l)
+}
+
+func (f *fakeMailer) SendWelcome(_ context.Context, e, base string) error {
+	return f.put("welcome", e, base)
 }
 
 type env struct {
@@ -160,6 +165,33 @@ func (c *client) signup(email string) {
 	}
 	if c.ck == "" {
 		c.t.Fatal("verify did not sign in")
+	}
+	if c.e.mail.get("welcome", email) != c.e.srv.URL {
+		c.t.Fatal("no welcome email")
+	}
+}
+
+func TestWelcomeSentOnce(t *testing.T) {
+	e := newEnv(t, true, 5)
+	c := e.newClient(t)
+	email := uniq("welcome")
+	c.signup(email)
+	_ = e.mail.put("welcome", email, "")
+
+	u, err := e.st.GetUserByEmail(context.Background(), email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.st.CreateEmailToken(context.Background(), u.ID, store.PurposeVerify, auth.HashToken("again"), time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := c.c.Get(e.srv.URL + "/verify?token=again")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if got := e.mail.get("welcome", email); got != "" {
+		t.Fatalf("welcome sent again: %q", got)
 	}
 }
 

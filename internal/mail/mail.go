@@ -20,6 +20,7 @@ type Sender interface {
 	SendReset(ctx context.Context, email, link string) error
 	SendInvite(ctx context.Context, email, link, inviter string) error
 	SendTeamInvite(ctx context.Context, email, link, inviter, team string) error
+	SendWelcome(ctx context.Context, email, base string) error
 }
 
 // Client is a Mailgun client. The API key is never logged or included in errors.
@@ -84,6 +85,24 @@ func (c *Client) SendVerify(ctx context.Context, email, link string) error {
 	return c.send(ctx, email, "Verify your Canvasbin email",
 		"Welcome to Canvasbin!\n\nConfirm your email address to finish setting up your account:\n\n"+link+
 			"\n\nThis link expires in 24 hours. If you didn't sign up, you can ignore this email.\n")
+}
+
+// SendWelcome is sent once, when an account's email is first verified. base is
+// the site origin, e.g. https://canvasbin.dev.
+func (c *Client) SendWelcome(ctx context.Context, email, base string) error {
+	return c.send(ctx, email, "Your Canvasbin account is ready",
+		"Your email is confirmed and your Canvasbin account is ready.\n\n"+
+			"Canvasbin puts HTML and Markdown pages at a private link, with a PDF and an edit link. "+
+			"The quickest way to use it is from your AI assistant. Connect Claude, ChatGPT or Cursor here:\n\n"+
+			base+"/connect\n\n"+
+			"Then try asking it something like:\n\n"+
+			"  \"Turn this week's sales figures into a dashboard and publish it to Canvasbin.\"\n"+
+			"  \"Write up our meeting notes as a Canvasbin page I can share with the team.\"\n"+
+			"  \"Draw a diagram of how our services connect and give me a Canvasbin link and a PDF.\"\n\n"+
+			"Your assistant can update the same page later, so the link stays the same.\n\n"+
+			"Prefer to write it yourself? Paste HTML or Markdown into the editor:\n\n"+
+			base+"/new\n\n"+
+			"Questions or feedback: "+base+"/contact\n")
 }
 
 func (c *Client) SendReset(ctx context.Context, email, link string) error {

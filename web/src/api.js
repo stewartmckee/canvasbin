@@ -23,7 +23,11 @@ async function request(method, path, body) {
   return data
 }
 
-export const createPage = (page) => request('POST', '/api/pages', page)
+export const createPage = async (page) => {
+  const res = await request('POST', '/api/pages', page)
+  track('editor-publish', { format: res.format, team: !!page.team_id })
+  return res
+}
 export const getPage = (key) => request('GET', `/api/pages/${encodeURIComponent(key)}`)
 export const updatePage = (key, page) => request('PUT', `/api/pages/${encodeURIComponent(key)}`, page)
 export const deletePage = (key) => request('DELETE', `/api/pages/${encodeURIComponent(key)}`)

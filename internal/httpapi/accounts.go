@@ -48,6 +48,7 @@ func (s *Server) SessionUser(r *http.Request) *store.User {
 func (s *Server) NewOAuth() *oauth.Provider {
 	return oauth.New(oauth.Options{
 		Store: s.Store, Config: s.Config, SessionUser: s.SessionUser, Limiter: s.AuthLimit,
+		Analytics: s.Analytics,
 	})
 }
 
@@ -372,6 +373,14 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	if u.Disabled() {
 		http.Redirect(w, r, "/?verify=disabled", http.StatusSeeOther)
 		return
+	}
+	if !u.Verified() {
+		s.Analytics.Event("/verify", "email-verified", nil)
+		if s.Mailer != nil {
+			if err := s.Mailer.SendWelcome(ctx, u.Email, s.baseURL(r)); err != nil {
+				slog.Error("send welcome", "err", err)
+			}
+		}
 	}
 	if err := s.startSession(w, r, u); err != nil {
 		slog.Error("start session", "err", err)

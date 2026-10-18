@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -103,7 +104,27 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request, f form) {
 		oauthError(w, http.StatusInternalServerError, "server_error", "internal error")
 		return
 	}
+	if p.Analytics.Enabled() {
+		p.Analytics.Event("/oauth/token", "ai-connected", map[string]any{"client": p.clientLabel(r.Context(), clientID)})
+	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// clientLabel names an OAuth client for analytics: the host of a URL client id
+// (CIMD), otherwise the registered client name.
+func (p *Provider) clientLabel(ctx context.Context, clientID string) string {
+	if u, err := url.Parse(clientID); err == nil && u.Scheme == "https" && u.Host != "" {
+		return u.Host
+	}
+	c, err := p.Store.GetOAuthClient(ctx, clientID)
+	if err != nil || strings.TrimSpace(c.ClientName) == "" {
+		return "unknown"
+	}
+	name := strings.TrimSpace(c.ClientName)
+	if r := []rune(name); len(r) > 40 {
+		name = string(r[:40])
+	}
+	return name
 }
 
 func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request, f form) {

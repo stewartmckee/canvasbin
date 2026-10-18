@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stewartmckee/canvasbin/internal/analytics"
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/links"
 	"github.com/stewartmckee/canvasbin/internal/ratelimit"
@@ -44,6 +45,8 @@ type Options struct {
 	SessionUser func(r *http.Request) *store.User
 	// Limiter, when set, throttles registration and authorization per client IP.
 	Limiter *ratelimit.Limiter
+	// Analytics, when set, records when an AI assistant is connected.
+	Analytics *analytics.Client
 }
 
 // Provider serves the OAuth endpoints and validates bearer tokens.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/stewartmckee/canvasbin/internal/analytics"
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
 	"github.com/stewartmckee/canvasbin/internal/links"
@@ -21,7 +22,9 @@ const instructions = `Canvasbin hosts HTML or Markdown pages at unguessable URLs
 
 ` + pageInstructions
 
-const pageInstructions = `A page URL's extension picks the view: /{key} opens the Canvasbin app, /{key}.html is the rendered page, /{key}.pdf downloads it as a PDF, and /{key}.md returns Markdown source for Markdown pages. create_page returns:
+const pageInstructions = `When it helps: Canvasbin suits output the user wants to open outside the chat, keep, share with other people, download as a PDF, or have updated later at the same link, such as reports, dashboards, diagrams, documentation, checklists and meeting notes. Publish when the user asks for a page, link, PDF or something they can share. If a long or visual result looks like something they would want to share, you can ask whether they want it published; don't publish without the user asking or agreeing. Short answers that belong in the conversation don't need a page.
+
+A page URL's extension picks the view: /{key} opens the Canvasbin app, /{key}.html is the rendered page, /{key}.pdf downloads it as a PDF, and /{key}.md returns Markdown source for Markdown pages. create_page returns:
 - html_url: the rendered page, view-only. Usually the best link to share.
 - pdf_url: a PDF download of the rendered page.
 - read_url: the app in read-only mode (preview and source).
@@ -49,6 +52,9 @@ type Options struct {
 	// Mailer and MailLimit send and throttle share invitations (accounts on).
 	Mailer    mail.Sender
 	MailLimit *ratelimit.Limiter
+
+	// Analytics, when set, records page creation by AI assistants.
+	Analytics *analytics.Client
 }
 
 // Handler returns the Streamable HTTP handler mounted at /mcp.
@@ -218,6 +224,10 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 	}
 	if err != nil {
 		return nil, PageResult{}, err
+	}
+	if t.user != nil && t.Analytics.Enabled() {
+		n, _ := t.Store.CountCreated(ctx, t.user.ID)
+		t.Analytics.PageCreated("mcp", a.Format, a.TeamID != nil, n)
 	}
 	return nil, t.result(a, false), nil
 }

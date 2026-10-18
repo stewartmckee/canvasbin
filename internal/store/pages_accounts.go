@@ -232,6 +232,13 @@ func (s *Store) CountOwned(ctx context.Context, userID int64) (int, error) {
 	return n, err
 }
 
+// CountCreated is the number of pages userID has created, personal and team.
+func (s *Store) CountCreated(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := s.db.QueryRow(ctx, `SELECT count(*) FROM pages WHERE owner_id = $1`, userID).Scan(&n)
+	return n, err
+}
+
 // ListOwnedAndShared returns every page the user owns, has been shared, or can
 // reach through a team, newest first.
 func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64) ([]PageSummary, error) {

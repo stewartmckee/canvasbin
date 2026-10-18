@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stewartmckee/canvasbin/internal/analytics"
 	"github.com/stewartmckee/canvasbin/internal/billing"
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
@@ -57,6 +58,8 @@ type Server struct {
 	// OAuth is the MCP authorization server. Handler creates one when accounts
 	// are on and this is nil; main sets it to share it with the MCP gate.
 	OAuth *oauth.Provider
+	// Analytics, when set, records events the browser can't see.
+	Analytics *analytics.Client
 }
 
 func (s *Server) Handler() http.Handler {
@@ -258,7 +261,8 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		a   *store.Access
 		err error
 	)
-	if u := s.SessionUser(r); u != nil && in.TeamID != nil {
+	u := s.SessionUser(r)
+	if u != nil && in.TeamID != nil {
 		if err = s.checkTeamCreate(r, u, *in.TeamID); err != nil {
 			writeStoreError(w, err)
 			return
@@ -283,6 +287,10 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeStoreError(w, err)
 		return
+	}
+	if u != nil && s.Analytics.Enabled() {
+		n, _ := s.Store.CountCreated(r.Context(), u.ID)
+		s.Analytics.PageCreated("web", a.Format, a.TeamID != nil, n)
 	}
 	writeJSON(w, http.StatusCreated, s.response(r, a))
 }
