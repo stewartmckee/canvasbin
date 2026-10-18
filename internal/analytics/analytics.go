@@ -16,8 +16,9 @@ import (
 	"time"
 )
 
-// Umami rejects requests whose User-Agent looks like a bot.
-const userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Canvasbin-Server"
+// Umami silently drops events whose User-Agent looks like a bot; words such as
+// "server" or "bot" trigger it.
+const userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Canvasbin/1.0"
 
 // Client posts events to Umami's /api/send. A nil *Client is valid and does nothing.
 type Client struct {
