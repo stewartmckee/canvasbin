@@ -29,6 +29,15 @@ export const connectHub = {
   ],
 }
 
+// Starter prompts shown on every connect page, once the assistant is connected.
+export const starterPrompts = [
+  'Create a new canvasbin and put a game of tic tac toe on it.',
+  'Create a canvasbin with the latest agentic news, create it in a newsroom style and make it a single page application with navigation and in depth articles.',
+  'Make a newspaper-style front page of today’s top stories and publish it to Canvasbin.',
+  'Turn this spreadsheet into a dashboard with charts and give me a Canvasbin link and a PDF.',
+  'Draw our system architecture as diagrams and publish it as a Canvasbin page.',
+]
+
 export const assistants = [
   {
     slug: 'claude',

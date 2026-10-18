@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import McpConnect from '../components/McpConnect.vue'
 import { auth, currentUser } from '../auth.js'
-import { assistants, connectHub, connectTools, findAssistant } from '../connect.js'
+import { assistants, connectHub, connectTools, findAssistant, starterPrompts } from '../connect.js'
 import { useCases } from '../usecases.js'
 
 // Without a slug this is the /connect hub; with one, a single assistant's page.
@@ -48,8 +48,19 @@ const crumbs = computed(() => [
       <McpConnect :only="a ? a.tabs : []" />
     </section>
 
+    <section id="first-pages" class="section">
+      <h2 class="section-title left">Connected? Try making a page</h2>
+      <p class="muted">Paste one of these into {{ a ? a.label : 'your assistant' }} to make your first page.</p>
+      <ul class="prompts">
+        <li v-for="p in starterPrompts" :key="p">“{{ p }}”</li>
+      </ul>
+      <p class="related-links">
+        <RouterLink to="/use-cases/news-apps-games">See a news page, a newsroom app and a 3D game made this way</RouterLink>
+      </p>
+    </section>
+
     <section v-if="a" id="prompts" class="section">
-      <h2 class="section-title left">Prompts to try</h2>
+      <h2 class="section-title left">More prompts for {{ a.label }}</h2>
       <ul class="prompts">
         <li v-for="p in a.prompts" :key="p">“{{ p }}”</li>
       </ul>

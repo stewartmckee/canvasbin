@@ -37,6 +37,7 @@ const year = new Date().getFullYear()
           <RouterLink to="/use-cases/developers">Developers</RouterLink>
           <RouterLink to="/use-cases/business">Business</RouterLink>
           <RouterLink to="/use-cases/family">Family &amp; hobbies</RouterLink>
+          <RouterLink to="/use-cases/news-apps-games">News, apps &amp; games</RouterLink>
         </div>
         <div>
           <h4>Company</h4>

@@ -182,10 +182,10 @@ func TestWelcomeSentOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.st.CreateEmailToken(context.Background(), u.ID, store.PurposeVerify, auth.HashToken("again"), time.Now().Add(time.Hour)); err != nil {
+	if err := e.st.CreateEmailToken(context.Background(), u.ID, store.PurposeVerify, auth.HashToken(email), time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	resp, err := c.c.Get(e.srv.URL + "/verify?token=again")
+	resp, err := c.c.Get(e.srv.URL + "/verify?token=" + url.QueryEscape(email))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +469,7 @@ func TestMarketingPagesIndexable(t *testing.T) {
 		return resp
 	}
 	on := newEnv(t, true, 20)
-	for _, p := range []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact", "/use-cases", "/use-cases/family"} {
+	for _, p := range []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact", "/use-cases", "/use-cases/family", "/use-cases/news-apps-games"} {
 		if r := get(on.srv, p); r.StatusCode != 200 || r.Header.Get("X-Robots-Tag") != "" {
 			t.Errorf("%s: status %d robots %q", p, r.StatusCode, r.Header.Get("X-Robots-Tag"))
 		}

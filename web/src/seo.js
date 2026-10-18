@@ -24,7 +24,7 @@ const pages = {
   '/use-cases': {
     title: 'Use cases: living pages built by AI agents · Canvasbin',
     description:
-      'Dashboards, reports and diagrams that your AI agent builds and keeps up to date on a schedule. See live examples for developers, business and families.',
+      'Dashboards, reports, news pages, apps and games that your AI agent builds and keeps up to date. See live examples for developers, business and families.',
   },
   '/connect': { title: connectHub.seoTitle, description: connectHub.seoDescription, faqs: connectHub.faqs },
   '/contact': {

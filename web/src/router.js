@@ -32,7 +32,7 @@ const routes = [
   { path: '/pricing', name: 'pricing', component: PricingView, meta: marketing('Pricing') },
   { path: '/use-cases', name: 'use-cases', component: UseCasesView, meta: marketing('Use cases') },
   {
-    path: '/use-cases/:slug(developers|business|family)',
+    path: '/use-cases/:slug(developers|business|family|news-apps-games)',
     name: 'use-case',
     component: UseCaseView,
     props: true,

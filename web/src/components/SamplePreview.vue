@@ -17,7 +17,8 @@ const url = sampleUrl(props.sample.key)
     <div class="sample-body">
       <h3>{{ sample.title }}</h3>
       <p class="muted">{{ sample.body }}</p>
-      <p class="sample-schedule">↻ {{ sample.schedule }}</p>
+      <p v-if="sample.schedule" class="sample-schedule">↻ {{ sample.schedule }}</p>
+      <p v-else-if="sample.origin" class="sample-schedule">✦ {{ sample.origin }}</p>
       <a :href="url" target="_blank" rel="noopener">Open the live page →</a>
     </div>
   </article>

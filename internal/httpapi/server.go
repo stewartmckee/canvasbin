@@ -128,6 +128,7 @@ func (s *Server) Handler() http.Handler {
 var marketingPaths = []string{
 	"/", "/features", "/pricing", "/privacy", "/terms", "/contact",
 	"/use-cases", "/use-cases/developers", "/use-cases/business", "/use-cases/family",
+	"/use-cases/news-apps-games",
 	"/connect", "/connect/claude", "/connect/chatgpt", "/connect/cursor",
 }
 
