@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
 import McpConnect from '../components/McpConnect.vue'
+import PromptList from '../components/PromptList.vue'
 import { auth, currentUser } from '../auth.js'
 import { assistants, connectHub, connectTools, findAssistant, starterPrompts } from '../connect.js'
 import { useCases } from '../usecases.js'
@@ -51,9 +52,7 @@ const crumbs = computed(() => [
     <section id="first-pages" class="section">
       <h2 class="section-title left">Connected? Try making a page</h2>
       <p class="muted">Paste one of these into {{ a ? a.label : 'your assistant' }} to make your first page.</p>
-      <ul class="prompts">
-        <li v-for="p in starterPrompts" :key="p">“{{ p }}”</li>
-      </ul>
+      <PromptList :prompts="starterPrompts" />
       <p class="related-links">
         <RouterLink to="/use-cases/news-apps-games">See a news page, a newsroom app and a 3D game made this way</RouterLink>
       </p>
@@ -61,9 +60,7 @@ const crumbs = computed(() => [
 
     <section v-if="a" id="prompts" class="section">
       <h2 class="section-title left">More prompts for {{ a.label }}</h2>
-      <ul class="prompts">
-        <li v-for="p in a.prompts" :key="p">“{{ p }}”</li>
-      </ul>
+      <PromptList :prompts="a.prompts" />
     </section>
 
     <section id="tools" class="section">

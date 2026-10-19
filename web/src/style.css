@@ -1162,12 +1162,31 @@ code {
   gap: 0.8rem;
 }
 .prompts li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  background: var(--accent-soft);
+  border: 1px solid #dcdfff;
+  border-radius: 18px 18px 4px 18px;
+  padding: 0.85rem 0.9rem 0.85rem 1.1rem;
+}
+.prompt-text {
+  flex: 1;
+}
+.prompt-copy {
+  flex: none;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
   background: var(--card);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--accent);
-  border-radius: var(--radius);
-  padding: 0.9rem 1.1rem;
-  font-style: italic;
+  border: 1px solid #dcdfff;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+}
+.prompt-copy:hover {
+  border-color: var(--accent);
 }
 .schedulers {
   margin: 0.4rem 0 0;

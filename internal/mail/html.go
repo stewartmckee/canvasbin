@@ -52,10 +52,11 @@ var emailTmpl = template.Must(template.New("email").Parse(`<!doctype html>
 <a href="{{.URL}}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;line-height:20px;color:#ffffff;text-decoration:none;border-radius:8px;border:1px solid #4f46e5;">{{.Label}}</a>
 </td></tr></table>
 {{end}}{{if .Prompts}}<p style="margin:8px 0 12px 0;font-size:16px;line-height:24px;color:#374151;font-weight:bold;">{{.PromptsIntro}}</p>
-{{range .Prompts}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px 0;">
-<tr><td style="background-color:#eef2ff;border-left:4px solid #4f46e5;border-radius:6px;padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#1e1b4b;">
-<span style="font-size:12px;line-height:16px;letter-spacing:1px;text-transform:uppercase;color:#4f46e5;font-weight:bold;">Try asking</span><br>
-&ldquo;{{.}}&rdquo;
+{{range .Prompts}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0;">
+<tr><td align="right">
+<table role="presentation" width="86%" cellpadding="0" cellspacing="0" border="0" style="width:86%;"><tr>
+<td bgcolor="#eef0ff" style="background-color:#eef0ff;border:1px solid #dcdfff;border-radius:18px 18px 4px 18px;padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#1d2433;text-align:left;">{{.}}</td>
+</tr></table>
 </td></tr></table>
 {{end}}{{end}}{{range .After}}<p style="margin:16px 0 0 0;font-size:16px;line-height:24px;color:#374151;">{{.}}</p>
 {{end}}{{if .Secondary}}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0 0;">

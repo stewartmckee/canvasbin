@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import Breadcrumbs from '../components/Breadcrumbs.vue'
+import PromptList from '../components/PromptList.vue'
 import SamplePreview from '../components/SamplePreview.vue'
 import { currentUser } from '../auth.js'
 import { capabilities, findUseCase, schedulers, useCases } from '../usecases.js'
@@ -65,9 +66,7 @@ const crumbs = computed(() => [
 
     <section id="prompts" class="section">
       <h2 class="section-title left">Prompts to try</h2>
-      <ul class="prompts">
-        <li v-for="p in uc.prompts" :key="p">“{{ p }}”</li>
-      </ul>
+      <PromptList :prompts="uc.prompts" />
     </section>
 
     <section id="ideas" class="section">
