@@ -1165,13 +1165,15 @@ code {
   display: flex;
   align-items: flex-start;
   gap: 0.8rem;
-  background: var(--accent-soft);
-  border: 1px solid #dcdfff;
-  border-radius: 18px 18px 4px 18px;
-  padding: 0.85rem 0.9rem 0.85rem 1.1rem;
+  background: #e6e9ff;
+  border: 1px solid #c7cdfe;
+  border-radius: 14px;
+  padding: 0.9rem 0.9rem 0.9rem 1.1rem;
 }
 .prompt-text {
   flex: 1;
+  font-weight: 600;
+  color: #1e1b4b;
 }
 .prompt-copy {
   flex: none;

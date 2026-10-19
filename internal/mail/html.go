@@ -53,9 +53,9 @@ var emailTmpl = template.Must(template.New("email").Parse(`<!doctype html>
 </td></tr></table>
 {{end}}{{if .Prompts}}<p style="margin:8px 0 12px 0;font-size:16px;line-height:24px;color:#374151;font-weight:bold;">{{.PromptsIntro}}</p>
 {{range .Prompts}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0;">
-<tr><td align="right">
-<table role="presentation" width="86%" cellpadding="0" cellspacing="0" border="0" style="width:86%;"><tr>
-<td bgcolor="#eef0ff" style="background-color:#eef0ff;border:1px solid #dcdfff;border-radius:18px 18px 4px 18px;padding:12px 18px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#1d2433;text-align:left;">{{.}}</td>
+<tr><td align="center">
+<table role="presentation" width="92%" cellpadding="0" cellspacing="0" border="0" style="width:92%;"><tr>
+<td bgcolor="#e6e9ff" style="background-color:#e6e9ff;border:1px solid #c7cdfe;border-radius:14px;padding:14px 18px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:23px;font-weight:bold;color:#1e1b4b;text-align:left;">{{.}}</td>
 </tr></table>
 </td></tr></table>
 {{end}}{{end}}{{range .After}}<p style="margin:16px 0 0 0;font-size:16px;line-height:24px;color:#374151;">{{.}}</p>
