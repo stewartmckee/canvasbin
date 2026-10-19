@@ -41,6 +41,12 @@ func New(key, domain, from string) *Client {
 }
 
 func (c *Client) send(ctx context.Context, to, subject, text string) error {
+	return c.sendHTML(ctx, to, subject, text, "")
+}
+
+// sendHTML sends a multipart message; text is the plain-text alternative and
+// html may be empty for a text-only message.
+func (c *Client) sendHTML(ctx context.Context, to, subject, text, html string) error {
 	if c.Key == "" {
 		return errors.New("mail: MAILGUN_SENDING_KEY not configured")
 	}
@@ -52,6 +58,9 @@ func (c *Client) send(ctx context.Context, to, subject, text string) error {
 	form.Set("to", to)
 	form.Set("subject", subject)
 	form.Set("text", text)
+	if html != "" {
+		form.Set("html", html)
+	}
 
 	base := c.BaseURL
 	if base == "" {
@@ -90,19 +99,51 @@ func (c *Client) SendVerify(ctx context.Context, email, link string) error {
 // SendWelcome is sent once, when an account's email is first verified. base is
 // the site origin, e.g. https://canvasbin.dev.
 func (c *Client) SendWelcome(ctx context.Context, email, base string) error {
-	return c.send(ctx, email, "Your Canvasbin account is ready",
-		"Your email is confirmed and your Canvasbin account is ready.\n\n"+
-			"Canvasbin puts HTML and Markdown pages at a private link, with a PDF and an edit link. "+
-			"The quickest way to use it is from your AI assistant. Connect Claude, ChatGPT or Cursor here:\n\n"+
-			base+"/connect\n\n"+
-			"Then try asking it something like:\n\n"+
-			"  \"Turn this week's sales figures into a dashboard and publish it to Canvasbin.\"\n"+
-			"  \"Write up our meeting notes as a Canvasbin page I can share with the team.\"\n"+
-			"  \"Draw a diagram of how our services connect and give me a Canvasbin link and a PDF.\"\n\n"+
-			"Your assistant can update the same page later, so the link stays the same.\n\n"+
-			"Prefer to write it yourself? Paste HTML or Markdown into the editor:\n\n"+
-			base+"/new\n\n"+
-			"Questions or feedback: "+base+"/contact\n")
+	text := "Your email is confirmed and your Canvasbin account is ready.\n\n" +
+		"Canvasbin puts HTML and Markdown pages at a private link, with a PDF and an edit link. " +
+		"The quickest way to use it is from your AI assistant. Connect Claude, ChatGPT or Cursor here:\n\n" +
+		base + "/connect\n\n" +
+		"Then try asking it something like:\n\n"
+	for _, p := range welcomePrompts {
+		text += "  \"" + p + "\"\n"
+	}
+	text += "\nSee pages made this way: " + base + "/use-cases/news-apps-games\n\n" +
+		"Your assistant can update the same page later, so the link stays the same.\n\n" +
+		"Prefer to write it yourself? Paste HTML or Markdown into the editor:\n\n" +
+		base + "/new\n\n" +
+		"Questions or feedback: " + base + "/contact\n"
+
+	html, err := htmlEmail{
+		Preheader: "Connect your AI assistant and publish your first page in a minute.",
+		Heading:   "Your Canvasbin account is ready",
+		Intro: []string{
+			"Your email is confirmed. Canvasbin puts HTML and Markdown pages at a private link, with a PDF and an edit link.",
+			"The quickest way to use it is from your AI assistant. Connect Claude, ChatGPT or Cursor once, and it can publish and update pages for you.",
+		},
+		Button:       &emailButton{Label: "Connect your AI assistant", URL: base + "/connect"},
+		PromptsIntro: "Then paste one of these into your assistant:",
+		Prompts:      welcomePrompts,
+		After: []string{
+			"Your assistant can update the same page later, so the link never changes. Prefer to write it yourself? Paste HTML or Markdown into the editor.",
+		},
+		Secondary: []emailButton{
+			{Label: "See example pages", URL: base + "/use-cases/news-apps-games"},
+			{Label: "Open the editor", URL: base + "/new"},
+		},
+		Footer:     "You're receiving this because you created a Canvasbin account. Questions or feedback?",
+		FooterLink: &emailButton{Label: "Contact us", URL: base + "/contact"},
+		Base:       base,
+	}.render()
+	if err != nil {
+		return err
+	}
+	return c.sendHTML(ctx, email, "Your Canvasbin account is ready", text, html)
+}
+
+var welcomePrompts = []string{
+	"Create a new canvasbin and put a game of tic tac toe on it.",
+	"Create a canvasbin with the latest agentic news, create it in a newsroom style and make it a single page application with navigation and in depth articles.",
+	"Turn this week's sales figures into a dashboard and give me a Canvasbin link and a PDF.",
 }
 
 func (c *Client) SendReset(ctx context.Context, email, link string) error {

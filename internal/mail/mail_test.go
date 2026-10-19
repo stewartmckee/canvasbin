@@ -34,10 +34,10 @@ func TestSendVerify(t *testing.T) {
 }
 
 func TestSendWelcome(t *testing.T) {
-	var text, subject string
+	var text, subject, html string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
-		text, subject = r.PostForm.Get("text"), r.PostForm.Get("subject")
+		text, subject, html = r.PostForm.Get("text"), r.PostForm.Get("subject"), r.PostForm.Get("html")
 	}))
 	defer srv.Close()
 	c := New("k", "example.dev", "x <x@example.dev>")
@@ -47,6 +47,10 @@ func TestSendWelcome(t *testing.T) {
 	}
 	if subject == "" || !strings.Contains(text, "https://canvasbin.test/connect") || !strings.Contains(text, "https://canvasbin.test/new") {
 		t.Fatalf("subject %q text %q", subject, text)
+	}
+	if !strings.Contains(html, `href="https://canvasbin.test/connect"`) || !strings.Contains(html, "tic tac toe") ||
+		!strings.Contains(html, "this week&#39;s sales") {
+		t.Fatalf("html %q", html)
 	}
 }
 
