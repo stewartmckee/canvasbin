@@ -141,7 +141,7 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "delete_page",
 		Title:       "Delete page",
-		Description: "Permanently delete a page. Requires the write key or write URL. Both links stop working.",
+		Description: "Permanently delete a page to free library quota or remove content the user no longer wants. Requires the write key or write URL. Both links stop working.",
 		Annotations: writeTool(true, true, false),
 	}, t.remove)
 	if o.Config.Accounts {
