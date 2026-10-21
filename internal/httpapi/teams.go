@@ -24,6 +24,8 @@ func (s *Server) teamRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/teams/{id}/invites/{invite}", s.cancelTeamInvite)
 	mux.HandleFunc("GET /api/teams/{id}/pages", s.teamPages)
 	mux.HandleFunc("GET /api/teams/{id}/activity", s.teamActivity)
+	mux.HandleFunc("GET /api/teams/{id}/style-guide", s.getStyleGuide)
+	mux.HandleFunc("PUT /api/teams/{id}/style-guide", s.setStyleGuide)
 	mux.HandleFunc("POST /api/teams/{id}/billing/checkout", s.teamCheckout)
 	mux.HandleFunc("POST /api/teams/{id}/billing/portal", s.teamPortal)
 
@@ -166,6 +168,78 @@ func (s *Server) getTeam(w http.ResponseWriter, r *http.Request) {
 		"invites":         invites,
 		"billing_enabled": s.Billing != nil && s.Billing.TeamEnabled(),
 	})
+}
+
+func styleGuideView(t *store.Team, guide string) map[string]any {
+	return map[string]any{
+		"team_id":     t.ID,
+		"team":        t.Name,
+		"style_guide": guide,
+		"max_length":  store.MaxStyleGuideRunes,
+		"can_edit":    true,
+	}
+}
+
+// styleGuideTeam loads the team for a member and refuses the call unless the
+// Team plan is active. Any member may then read, create, or update the guide.
+func (s *Server) styleGuideTeam(w http.ResponseWriter, r *http.Request) (*store.User, *store.Team, bool) {
+	u, t, ok := s.team(w, r, false)
+	if !ok {
+		return nil, nil, false
+	}
+	if !t.Active() {
+		writeStoreError(w, config.StyleGuideInactiveError(s.baseURL(r), t.ID))
+		return nil, nil, false
+	}
+	return u, t, true
+}
+
+func (s *Server) getStyleGuide(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := s.styleGuideTeam(w, r)
+	if !ok {
+		return
+	}
+	guide, err := s.Store.GetStyleGuide(r.Context(), t.ID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, styleGuideView(t, guide))
+}
+
+func (s *Server) setStyleGuide(w http.ResponseWriter, r *http.Request) {
+	u, t, ok := s.styleGuideTeam(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		StyleGuide string `json:"style_guide"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	prev, err := s.Store.GetStyleGuide(r.Context(), t.ID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	guide, err := s.Store.SetStyleGuide(r.Context(), t.ID, in.StyleGuide)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if guide != prev {
+		detail := ""
+		if guide == "" {
+			detail = "cleared"
+		}
+		s.logActivity(r, store.ActivityEntry{
+			TeamID: t.ID, UserID: u.ID, Action: store.ActivityStyleGuideUpdated, Detail: detail,
+		})
+	}
+	out := styleGuideView(t, guide)
+	out["created"] = prev == "" && guide != ""
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) renameTeam(w http.ResponseWriter, r *http.Request) {

@@ -95,6 +95,10 @@ CREATE TABLE IF NOT EXISTS teams (
     updated_at             timestamptz NOT NULL DEFAULT now()
 );
 
+-- How assistants should write this team's pages. Empty means no guide.
+-- Only meaningful while the team plan is active; the API enforces that.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS style_guide text NOT NULL DEFAULT '';
+
 CREATE TABLE IF NOT EXISTS team_members (
     team_id    bigint      NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
     user_id    bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,

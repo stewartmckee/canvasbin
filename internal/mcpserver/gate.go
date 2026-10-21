@@ -21,7 +21,9 @@ const (
 )
 
 // readTools need only pages:read; every other tool needs pages:write.
-var readTools = map[string]bool{"list_pages": true, "get_page": true, "list_teams": true, "list_comments": true}
+var readTools = map[string]bool{
+	"list_pages": true, "get_page": true, "list_teams": true, "list_comments": true, "get_style_guide": true,
+}
 
 // maxGateBody caps the JSON-RPC body the gate buffers (same cap as the SDK).
 const maxGateBody = 3*store.MaxContentBytes + 64<<10

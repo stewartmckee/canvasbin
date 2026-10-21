@@ -23,9 +23,12 @@ export const connectHub = {
     ],
     [
       'What can my assistant see?',
-      'Only your Canvasbin pages, the pages shared with you and your team pages. It can’t reach anything else in your account, such as billing.',
+      'Only your Canvasbin pages, the pages shared with you, your team pages, and a team’s style guide when the Team plan is active. It can’t reach anything else in your account, such as billing.',
     ],
-    ['Does it cost anything?', 'No. The MCP server is included on every plan, including Free.'],
+    [
+      'Does it cost anything?',
+      'The MCP server is included on every plan, including Free. A team style guide, which assistants follow when they write team pages, is part of the Team plan.',
+    ],
   ],
 }
 
@@ -141,6 +144,16 @@ export const connectTools = [
   ['Share with people', 'Invite people by email as viewers or editors (Team plan).', 'share_page'],
   ['Publish to a team', 'Create pages in a shared team space everyone can edit.', 'list_teams'],
   ['Comment', 'Read and reply to comments on team pages.', 'add_comment'],
+  [
+    'Follow a style guide',
+    'On the Team plan, read how a team wants its pages written before creating one.',
+    'get_style_guide',
+  ],
+  [
+    'Set a style guide',
+    'On the Team plan, create or update how a team wants its pages written. Any member can do this.',
+    'set_style_guide',
+  ],
 ]
 
 export const findAssistant = (slug) => assistants.find((a) => a.slug === slug)

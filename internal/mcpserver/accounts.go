@@ -28,8 +28,11 @@ create_page publishes into the user's own library and counts toward their page q
 - share_page: give someone access to an owned page by email (viewer or editor); they are emailed an invitation. Team plan only.
 - unshare_page: remove someone's access.
 - list_comments / add_comment: read and post comments on a team page. Team members only.
+- get_style_guide / set_style_guide: read, create, or update a team's style guide. Team plan only. Any member of that team can create or update it. set_style_guide creates the guide when the team has none and replaces it when one already exists. Pass an empty style_guide to clear it.
 
 When the page quota is full, create_page and claim_page return an error that explains the user's options. Only delete pages to make room if the user asks.
+
+Style guides are a Team plan feature. Before create_page into a team, call get_style_guide with that team's name or id. If it returns a style guide, follow it when you write the page. If the guide is empty, or the team's plan is not active, write the page as usual. Personal pages have no style guide. When the user wants to set or change how a team's pages are written, call set_style_guide: it creates the guide if there isn't one and updates it if there is.
 
 ` + pageInstructions
 
@@ -120,6 +123,18 @@ func (t *tools) addAccountTools(s *mcp.Server) {
 		Description: "Post a comment on a team page as the signed-in user. Team members only; comments are never shown to people viewing by link.",
 		Annotations: writeTool(false, false, false),
 	}, t.addComment)
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "get_style_guide",
+		Title:       "Get style guide",
+		Description: "Read a team's style guide: the text that says how its pages should be written. Call this before create_page when publishing into a team, and follow the guide when one is set. Team plan only. An empty style_guide means the team has not set one.",
+		Annotations: readTool(),
+	}, t.getStyleGuide)
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "set_style_guide",
+		Title:       "Create or update style guide",
+		Description: "Create or update a team's style guide, the text assistants follow when they write that team's pages. Team plan only. Any member of the team can call this. If the team has no guide, this creates one. If it already has one, this replaces it. Pass an empty style_guide to clear it. created is true only when this call saved the team's first guide.",
+		Annotations: writeTool(true, true, false),
+	}, t.setStyleGuide)
 }
 
 type TeamSummary struct {
@@ -147,6 +162,101 @@ type AddCommentInput struct {
 
 type CommentsResult struct {
 	Comments []store.Comment `json:"comments"`
+}
+
+type StyleGuideInput struct {
+	Team string `json:"team" jsonschema:"name or id of one of the user's teams"`
+}
+
+type SetStyleGuideInput struct {
+	Team       string `json:"team" jsonschema:"name or id of one of the user's teams"`
+	StyleGuide string `json:"style_guide" jsonschema:"the style guide text; empty clears it. Maximum 8000 characters"`
+}
+
+type StyleGuideResult struct {
+	Team       string `json:"team"`
+	TeamID     int64  `json:"team_id"`
+	StyleGuide string `json:"style_guide"`
+}
+
+// StyleGuideWriteResult is what set_style_guide returns. Created distinguishes
+// a first save from a later update.
+type StyleGuideWriteResult struct {
+	StyleGuideResult
+	Created bool `json:"created" jsonschema:"true when this call created the team's first style guide; false when it updated or cleared an existing one"`
+}
+
+// teamForStyle resolves a team the user belongs to. Style guides exist only
+// while that team's plan is active.
+func (t *tools) teamForStyle(ctx context.Context, ref string) (*store.Team, error) {
+	if err := t.requireUser(); err != nil {
+		return nil, err
+	}
+	teams, err := t.Store.ListTeams(ctx, t.user.ID)
+	if err != nil {
+		return nil, err
+	}
+	ref = strings.TrimSpace(ref)
+	var match *store.Team
+	for i := range teams {
+		if strconv.FormatInt(teams[i].ID, 10) == ref || strings.EqualFold(teams[i].Name, ref) {
+			match = &teams[i]
+			break
+		}
+	}
+	if match == nil {
+		return nil, fmt.Errorf("no team called %q; call list_teams to see the user's teams", ref)
+	}
+	if !match.Active() {
+		return nil, config.StyleGuideInactiveError(t.base, match.ID)
+	}
+	return match, nil
+}
+
+func (t *tools) styleGuideResult(tm *store.Team, guide string) StyleGuideResult {
+	return StyleGuideResult{Team: tm.Name, TeamID: tm.ID, StyleGuide: guide}
+}
+
+func (t *tools) getStyleGuide(ctx context.Context, _ *mcp.CallToolRequest, in StyleGuideInput) (*mcp.CallToolResult, StyleGuideResult, error) {
+	tm, err := t.teamForStyle(ctx, in.Team)
+	if err != nil {
+		return nil, StyleGuideResult{}, err
+	}
+	guide, err := t.Store.GetStyleGuide(ctx, tm.ID)
+	if err != nil {
+		return nil, StyleGuideResult{}, err
+	}
+	return nil, t.styleGuideResult(tm, guide), nil
+}
+
+func (t *tools) setStyleGuide(ctx context.Context, _ *mcp.CallToolRequest, in SetStyleGuideInput) (*mcp.CallToolResult, StyleGuideWriteResult, error) {
+	tm, err := t.teamForStyle(ctx, in.Team)
+	if err != nil {
+		return nil, StyleGuideWriteResult{}, err
+	}
+	prev, err := t.Store.GetStyleGuide(ctx, tm.ID)
+	if err != nil {
+		return nil, StyleGuideWriteResult{}, err
+	}
+	guide, err := t.Store.SetStyleGuide(ctx, tm.ID, in.StyleGuide)
+	if err != nil {
+		return nil, StyleGuideWriteResult{}, err
+	}
+	if guide != prev {
+		detail := ""
+		if guide == "" {
+			detail = "cleared"
+		}
+		if err := t.Store.LogActivity(ctx, store.ActivityEntry{
+			TeamID: tm.ID, UserID: t.user.ID, Action: store.ActivityStyleGuideUpdated, Detail: detail,
+		}); err != nil {
+			slog.Error("log activity", "err", err, "action", store.ActivityStyleGuideUpdated)
+		}
+	}
+	return nil, StyleGuideWriteResult{
+		StyleGuideResult: t.styleGuideResult(tm, guide),
+		Created:          prev == "" && guide != "",
+	}, nil
 }
 
 func (t *tools) listTeams(ctx context.Context, _ *mcp.CallToolRequest, _ ListPagesInput) (*mcp.CallToolResult, ListTeamsResult, error) {

@@ -19,7 +19,7 @@ const pages = {
   },
   '/pricing': {
     title: 'Pricing: free HTML hosting, Individual and Team plans · Canvasbin',
-    description: `Host up to 5 HTML or Markdown pages free. Individual is ${site.proPrice} a month for 100 pages. Team is ${site.teamBasePrice} a month plus ${site.teamSeatPrice} per user, with shared pages and comments.`,
+    description: `Host up to 5 HTML or Markdown pages free. Individual is ${site.proPrice} a month for 100 pages. Team is ${site.teamBasePrice} a month plus ${site.teamSeatPrice} per user, with shared pages, comments and a style guide.`,
   },
   '/use-cases': {
     title: 'Use cases: living pages built by AI agents · Canvasbin',

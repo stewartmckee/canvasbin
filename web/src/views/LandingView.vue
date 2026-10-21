@@ -41,6 +41,11 @@ const features = [
     body: 'Invite people by email as viewers or editors. Everything you own and everything shared with you, in one library.',
   },
   {
+    title: 'A style guide for your team',
+    to: '/pricing#plans',
+    body: 'On the Team plan, describe how pages should be written. Assistants read it before they publish a team page.',
+  },
+  {
     title: 'Private by default',
     to: '/features#safety',
     body: 'Unguessable links, pages kept out of search engines, and scripts in your pages run in a locked-down sandbox.',

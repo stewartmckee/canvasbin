@@ -5,7 +5,7 @@ import { site } from '../site.js'
 <template>
   <div class="marketing legal">
     <h1>Privacy policy</h1>
-    <p class="muted small">Last updated 17 October 2026</p>
+    <p class="muted small">Last updated 21 October 2026</p>
     <p>
       {{ site.name }} is operated by {{ site.operator }} (“we”, “us”). This policy explains what we collect when you use
       {{ site.name }}, why, and the choices you have.
@@ -15,6 +15,10 @@ import { site } from '../site.js'
     <ul>
       <li><strong>Account details:</strong> your email address, an optional display name and a securely hashed password.</li>
       <li><strong>Your pages:</strong> the content, titles and formats of pages you create, and who you share them with.</li>
+      <li>
+        <strong>Team style guides:</strong> text a team saves, on the Team plan, to tell assistants how to write its
+        pages. Any member of the team can create or update it, and an assistant that member connects can too.
+      </li>
       <li>
         <strong>Billing:</strong> if you subscribe, Stripe processes your payment. We store your Stripe customer reference
         and subscription status, never your card details.
@@ -34,8 +38,9 @@ import { site } from '../site.js'
     <h2>AI assistants (MCP)</h2>
     <p>
       When you connect Claude, ChatGPT, Cursor or another assistant to {{ site.name }}, it can only use the tools you
-      approve during sign-in, and only on pages you own, pages shared with you and your teams’ pages. We receive just
-      what the assistant sends in each tool call, such as a page’s title and content or an email address you ask it to
+      approve during sign-in, and only on pages you own, pages shared with you, your teams’ pages, and a team’s style
+      guide when the Team plan is active. We receive just
+      what the assistant sends in each tool call, such as a page’s title and content, a style guide, or an email address you ask it to
       share with. We never receive your conversation with the assistant. That data is used only to carry out the
       request and is handled like everything else in this policy. You can revoke an assistant’s access at any time
       from your account page.

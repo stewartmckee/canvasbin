@@ -49,8 +49,8 @@ async function upgrade() {
         {{ site.proInterval }}.
       </template>
       <template v-else-if="offer === 'team'">
-        A Team gives everyone in it {{ auth.teamQuota.toLocaleString() }} shared pages, for {{ site.teamBasePrice }} a
-        month plus {{ site.teamSeatPrice }} per member.
+        A Team gives everyone in it {{ auth.teamQuota.toLocaleString() }} shared pages, comments and a style guide, for
+        {{ site.teamBasePrice }} a month plus {{ site.teamSeatPrice }} per member.
       </template>
       <template v-if="full">{{ offer ? 'Or delete' : 'Delete' }} a page you no longer need to make room.</template>
     </p>

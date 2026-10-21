@@ -246,8 +246,8 @@ func errorPage(w http.ResponseWriter, status int, msg string) {
 }
 
 var scopeLabels = map[string]string{
-	ScopeRead:    "Read your pages",
-	ScopeWrite:   "Create, edit, share and delete your pages",
+	ScopeRead:    "Read your pages, and your teams' style guides on the Team plan",
+	ScopeWrite:   "Create, edit, share and delete your pages, and edit team style guides on the Team plan",
 	ScopeOffline: "Stay connected until you revoke access",
 }
 

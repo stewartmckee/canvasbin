@@ -318,10 +318,11 @@ url = "https://{your-canvas-bin-host}/mcp"
 
 ### Tools
 
-- `create_page` — publish HTML or Markdown. Returns `html_url`, `pdf_url`, `read_url`, `write_url`, and the keys.
+- `create_page` — publish HTML or Markdown. Returns `html_url`, `pdf_url`, `read_url`, `write_url`, and the keys. When publishing into a team, the agent is asked to read that team's style guide first.
 - `get_page` — read a page by read key, write key, or URL.
 - `update_page` — replace content, title, or format. Needs the write key. Omitted fields stay as they are. `content` replaces the whole page.
 - `delete_page` — delete a page. Needs the write key.
+- `get_style_guide` / `set_style_guide` — read, create, or update a team's style guide (accounts on, Team plan only). Any member of an active team can create the guide or replace it later. `create_page` tells the agent to call `get_style_guide` before writing a team page.
 
 Tools that take a key accept the bare key or any Canvasbin URL. HTML may be a
 fragment or a full document. Scripts in the rendered page run in a sandbox.

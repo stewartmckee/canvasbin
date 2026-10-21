@@ -17,10 +17,10 @@
       "interface": {
         "displayName": "Canvasbin",
         "shortDescription": "Publish pages at a link",
-        "longDescription": "Canvasbin turns HTML and Markdown into hosted pages with shareable links. Ask ChatGPT to build a dashboard, report, diagram, meeting notes or a one-page site, and it publishes the result to your Canvasbin library. Each page gets a view link, a PDF download and a private edit link.\n\nChatGPT can update a page in place, so the link people already have always shows the latest version. That makes it easy to keep weekly reports, project status pages and family dashboards current without sending a new file every time.\n\nWhat you can do:\n- Publish HTML or Markdown as a hosted page\n- Update or delete pages, and list your library\n- Publish into a shared team space, invite people to a page by email, and discuss team pages in comments\n\nWho it's for: anyone who wants to share something ChatGPT made as a link rather than a file, from developers and analysts to families.\n\nLimitations: you need a Canvasbin account, and team features need a team. Pages are reachable by anyone with the view link, so don't publish anything you wouldn't share that way. Pages are marked not to be indexed by search engines, and scripts in pages run in a sandbox.",
+        "longDescription": "Canvasbin turns HTML and Markdown into hosted pages with shareable links. Ask ChatGPT to build a dashboard, report, diagram, meeting notes or a one-page site, and it publishes the result to your Canvasbin library. Each page gets a view link, a PDF download and a private edit link.\n\nChatGPT can update a page in place, so the link people already have always shows the latest version. That makes it easy to keep weekly reports, project status pages and family dashboards current without sending a new file every time.\n\nWhat you can do:\n- Publish HTML or Markdown as a hosted page\n- Update or delete pages, and list your library\n- Publish into a shared team space, invite people to a page by email, and discuss team pages in comments\n- On the Team plan, read a team's style guide before writing its pages, and create or update that guide\n\nWho it's for: anyone who wants to share something ChatGPT made as a link rather than a file, from developers and analysts to families.\n\nLimitations: you need a Canvasbin account, and team features need a team. Pages are reachable by anyone with the view link, so don't publish anything you wouldn't share that way. Pages are marked not to be indexed by search engines, and scripts in pages run in a sandbox.",
         "developerName": "Active Information Design Limited",
         "category": "Productivity",
-        "capabilities": ["Publish pages", "Update pages", "List pages", "Share pages", "Team comments"],
+        "capabilities": ["Publish pages", "Update pages", "List pages", "Share pages", "Team comments", "Team style guides"],
         "websiteURL": "https://canvasbin.dev",
         "supportURL": "https://canvasbin.dev/contact",
         "privacyPolicyURL": "https://canvasbin.dev/privacy",
@@ -60,14 +60,20 @@
             {
               "description": "Publish into a team space",
               "prompt": "Publish these notes as a Markdown page in my Review Team space: Retro, 17 October. Went well: shipped the portal beta. To improve: earlier QA.",
-              "tools_triggered": "list_teams, create_page",
-              "expected_behavior": "Creates a Markdown page in the Review Team space and returns its view link. The page appears under the team in list_pages."
+              "tools_triggered": "list_teams, get_style_guide, create_page",
+              "expected_behavior": "Reads the Review Team style guide, then creates a Markdown page in that style in the Review Team space and returns its view link. The page appears under the team in list_pages."
             },
             {
               "description": "Read and reply to team comments",
               "prompt": "What comments are on the Team roadmap page? Reply that PDF export can move to October.",
               "tools_triggered": "list_pages, list_comments, add_comment",
               "expected_behavior": "Summarises the existing comment about moving PDF export to October, then posts the reply as the signed-in user."
+            },
+            {
+              "description": "Set a team style guide and publish in that style",
+              "prompt": "Set the Review Team style guide to short sentences and British English, then publish a one-page status update to that team.",
+              "tools_triggered": "set_style_guide, get_style_guide, create_page",
+              "expected_behavior": "Creates the style guide, or updates it if one already exists (Team plan, any team member), reads it back, then publishes a team page written in that style and returns its view link."
             }
           ],
           "negative": [
@@ -89,7 +95,7 @@
         "commerce_description": "Canvasbin does not sell products or process payments in ChatGPT."
       },
       "publication": {
-        "release_notes": "Initial release: publish, read, update, delete and list pages; share pages by email; team spaces and comments."
+        "release_notes": "Publish, read, update, delete and list pages; share pages by email; team spaces, comments and Team plan style guides."
       }
     }
   }

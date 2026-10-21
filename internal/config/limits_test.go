@@ -31,6 +31,8 @@ func TestLimitErrors(t *testing.T) {
 			[]string{"this team's pages", "support@canvasbin.dev"}, nil},
 		{"team inactive", TeamInactiveError(base, 7), store.ErrTeamInactive,
 			[]string{base + "/teams/7"}, nil},
+		{"style guide inactive", StyleGuideInactiveError(base, 7), store.ErrTeamInactive,
+			[]string{"style guide", "Team plan", base + "/teams/7"}, nil},
 		{"unverified", UnverifiedError(base), store.ErrUnverified,
 			[]string{"verification email", base + "/account"}, nil},
 	}

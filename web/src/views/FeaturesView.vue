@@ -32,6 +32,10 @@ const groups = [
       ['Remote MCP server', 'Canvasbin is a remote MCP server over Streamable HTTP, so it works with any MCP client.'],
       ['Secure sign-in', 'Your AI asks you to sign in to Canvasbin before it publishes, and only acts on your account.'],
       ['Keeps pages current', 'Ask your assistant to refresh a report and the same link shows the new version.'],
+      [
+        'Team style guide',
+        'On the Team plan, write how you want pages to look and sound. Assistants read it before they create a team page.',
+      ],
       ['Runs on a schedule', 'Pair Canvasbin with Cursor Automations or scheduled tasks and dashboards update themselves.'],
       ['Rich, interactive pages', 'Agents can use charts, diagrams and scripts, anything a web page can do.'],
     ],
@@ -49,7 +53,7 @@ const groups = [
     items: [
       ['Your library', 'Every page you own and every page shared with you, in one list.'],
       ['Claim older pages', 'Have an edit link from before you signed up? Claim it into your library.'],
-      ['Plans that grow with you', 'Start free, upgrade to Individual for more pages, or bring your team for shared pages, comments and a timeline.'],
+      ['Plans that grow with you', 'Start free, upgrade to Individual for more pages, or bring your team for shared pages, comments, a timeline and a style guide.'],
     ],
     links: [['/pricing#plans', 'Compare plans']],
   },

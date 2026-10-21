@@ -6,7 +6,7 @@ import { site } from '../site.js'
 <template>
   <div class="marketing legal">
     <h1>Terms of service</h1>
-    <p class="muted small">Last updated 15 October 2026</p>
+    <p class="muted small">Last updated 21 October 2026</p>
     <p>
       These terms apply when you use {{ site.name }}, operated by {{ site.operator }}. By creating an account or using
       the service you agree to them.
@@ -21,7 +21,8 @@ import { site } from '../site.js'
     <h2>Your content</h2>
     <p>
       You own the pages you create. You give us permission to store, render and serve them so the service works. You’re
-      responsible for your pages and for who you share links with.
+      responsible for your pages and for who you share links with. A team’s style guide, available on the Team plan, is
+      part of that team: any member can create or update it, and an assistant connected by a member can do the same.
     </p>
 
     <h2>Acceptable use</h2>

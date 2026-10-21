@@ -45,6 +45,12 @@ func TeamInactiveError(base string, teamID int64) error {
 	return fmt.Errorf("%w. The team owner can restart it at %s/teams/%d", store.ErrTeamInactive, base, teamID)
 }
 
+// StyleGuideInactiveError explains that style guides are a Team plan feature.
+func StyleGuideInactiveError(base string, teamID int64) error {
+	return fmt.Errorf("%w: a style guide is part of the Team plan. The team owner can subscribe at %s/teams/%d",
+		store.ErrTeamInactive, base, teamID)
+}
+
 // UnverifiedError explains how to unlock page creation for a new account.
 func UnverifiedError(base string) error {
 	return fmt.Errorf("%w: click the link in the verification email from Canvasbin, or resend it from %s/account, then try again",

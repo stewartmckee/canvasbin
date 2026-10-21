@@ -7,17 +7,18 @@ import (
 
 // Timeline actions.
 const (
-	ActivityPageCreated    = "page_created"
-	ActivityPageEdited     = "page_edited"
-	ActivityPageDeleted    = "page_deleted"
-	ActivityCommentAdded   = "comment_added"
-	ActivityMemberJoined   = "member_joined"
-	ActivityMemberInvited  = "member_invited"
-	ActivityMemberRemoved  = "member_removed"
-	ActivityMemberLeft     = "member_left"
-	ActivityRoleChanged    = "role_changed"
-	ActivityTeamRenamed    = "team_renamed"
-	ActivityTeamSubscribed = "team_subscribed"
+	ActivityPageCreated       = "page_created"
+	ActivityPageEdited        = "page_edited"
+	ActivityPageDeleted       = "page_deleted"
+	ActivityCommentAdded      = "comment_added"
+	ActivityMemberJoined      = "member_joined"
+	ActivityMemberInvited     = "member_invited"
+	ActivityMemberRemoved     = "member_removed"
+	ActivityMemberLeft        = "member_left"
+	ActivityRoleChanged       = "role_changed"
+	ActivityTeamRenamed       = "team_renamed"
+	ActivityTeamSubscribed    = "team_subscribed"
+	ActivityStyleGuideUpdated = "style_guide_updated"
 )
 
 // editWindow folds repeated edits of a page by the same person into one entry,

@@ -75,6 +75,8 @@ export const removeTeamMember = (id, userId) => request('DELETE', `${teamPath(id
 export const cancelTeamInvite = (id, inviteId) => request('DELETE', `${teamPath(id)}/invites/${inviteId}`)
 export const getTeamPages = (id) => request('GET', `${teamPath(id)}/pages`)
 export const getTeamActivity = (id) => request('GET', `${teamPath(id)}/activity`)
+export const getStyleGuide = (id) => request('GET', `${teamPath(id)}/style-guide`)
+export const setStyleGuide = (id, styleGuide) => request('PUT', `${teamPath(id)}/style-guide`, { style_guide: styleGuide })
 export const startTeamCheckout = (id) => {
   track('checkout-start', { plan: 'team' })
   return request('POST', `${teamPath(id)}/billing/checkout`)

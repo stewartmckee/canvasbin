@@ -7,8 +7,10 @@ passwords.
 With accounts on (as on canvasbin.dev), people sign in with email and password,
 and MCP clients connect with OAuth 2.1 (PKCE, dynamic client registration).
 Agents get bearer tokens scoped to `pages:read` / `pages:write`, which you can
-revoke by disconnecting the app on your account page. Existing page links keep
-working by key without signing in.
+revoke by disconnecting the app on your account page. Those scopes also cover a
+team’s style guide, which is available only while the Team plan is active:
+any member of that team can read, create, or update it. Existing page
+links keep working by key without signing in.
 
 ## Reporting a vulnerability
 

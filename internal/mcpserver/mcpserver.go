@@ -109,10 +109,16 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	}, &mcp.ServerOptions{Instructions: text})
 	t := &tools{Options: o, base: base, clientIP: clientIP, user: user}
 
+	createDesc := "Publish a new HTML or Markdown page. Returns html_url (rendered, view-only), pdf_url, read_url (read-only app view) and write_url (browser editor), plus the keys."
+	updateDesc := "Edit a page directly: change its content, title or format. Requires the write key or write URL. Omitted fields are left unchanged; content replaces the whole page. Changes are live on the page URLs immediately."
+	if o.Config.Accounts {
+		createDesc += " When the page is for a team, call get_style_guide for that team before you write it, and follow the style guide when one is set. Style guides are a Team plan feature; if the guide is empty or the plan is not active, write the page as usual."
+		updateDesc += " When the page belongs to a team, call get_style_guide for that team if you have not already, and keep following the guide when one is set."
+	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "create_page",
 		Title:       "Create page",
-		Description: "Publish a new HTML or Markdown page. Returns html_url (rendered, view-only), pdf_url, read_url (read-only app view) and write_url (browser editor), plus the keys.",
+		Description: createDesc,
 		Annotations: writeTool(false, false, false),
 	}, t.create)
 	mcp.AddTool(s, &mcp.Tool{
@@ -124,7 +130,7 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "update_page",
 		Title:       "Update page",
-		Description: "Edit a page directly: change its content, title or format. Requires the write key or write URL. Omitted fields are left unchanged; content replaces the whole page. Changes are live on the page URLs immediately.",
+		Description: updateDesc,
 		Annotations: writeTool(true, true, false),
 	}, t.update)
 	mcp.AddTool(s, &mcp.Tool{

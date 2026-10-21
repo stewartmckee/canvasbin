@@ -78,6 +78,7 @@ async function upgrade() {
         <li>Up to {{ auth.teamQuota }} team pages</li>
         <li>Every member can view and edit team pages</li>
         <li>Comments and a team timeline</li>
+        <li>A style guide assistants follow when writing team pages</li>
         <li>Share pages with people by email</li>
         <li>Owner and admin roles</li>
         <li>No Canvasbin badge</li>

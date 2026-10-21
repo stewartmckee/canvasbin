@@ -110,6 +110,13 @@ func TestGate(t *testing.T) {
 	if rec := do("POST", call("list_pages"), "Bearer good"); rec.Code != 200 || ctxUser != alice {
 		t.Errorf("list_pages with token: code=%d user=%v", rec.Code, ctxUser)
 	}
+	// Reading a style guide needs only pages:read. Changing one needs pages:write.
+	if rec := do("POST", call("get_style_guide"), "Bearer good"); rec.Code != 200 || reached != 1 {
+		t.Errorf("get_style_guide with read scope: code=%d reached=%d", rec.Code, reached)
+	}
+	if rec := do("POST", call("set_style_guide"), "Bearer good"); rec.Code != 403 || reached != 0 || !strings.Contains(rec.Header().Get("WWW-Authenticate"), `error="insufficient_scope"`) {
+		t.Errorf("set_style_guide with read scope: code=%d hdr=%q", rec.Code, rec.Header().Get("WWW-Authenticate"))
+	}
 	// Read-only scope can't write, even inside a batch.
 	for _, body := range []string{call("create_page"), `[` + call("get_page") + `,` + call("update_page") + `]`} {
 		rec := do("POST", body, "Bearer good")

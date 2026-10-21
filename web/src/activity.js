@@ -23,6 +23,8 @@ export function describeActivity(a) {
       return `${who} changed a role: ${a.detail}`
     case 'team_renamed':
       return `${who} renamed the team to “${a.detail}”`
+    case 'style_guide_updated':
+      return a.detail === 'cleared' ? `${who} cleared the style guide` : `${who} updated the style guide`
     default:
       return `${who}: ${a.action}`
   }

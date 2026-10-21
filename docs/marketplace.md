@@ -28,7 +28,7 @@ Canvasbin turns HTML and Markdown into hosted pages with shareable links. Ask yo
 
 Your assistant can update a page in place, so the link people already have always shows the latest version. That makes it easy to keep weekly reports, project status pages and family dashboards current without sending a new file every time.
 
-With a team you can publish into a shared team space, invite people to individual pages by email and discuss pages in comments.
+With a team you can publish into a shared team space, invite people to individual pages by email and discuss pages in comments. On the Team plan, a style guide tells the assistant how that team's pages should be written; it reads the guide before creating a team page.
 
 Pages are served from unguessable links, are marked not to be indexed by search engines, and run any scripts in a sandbox.
 
@@ -38,7 +38,7 @@ Every tool has a title and explicit `readOnlyHint`, `destructiveHint` and `openW
 
 | Tool | Title | Read only | Destructive | Open world | What it does |
 |---|---|---|---|---|---|
-| `create_page` | Create page | no | no | no | Publishes HTML or Markdown to the user's library or a team space. |
+| `create_page` | Create page | no | no | no | Publishes HTML or Markdown to the user's library or a team space. For a team page, the description tells the assistant to call `get_style_guide` first and follow it. |
 | `get_page` | Get page | yes | no | no | Reads a page's title, format, content and links. |
 | `update_page` | Update page | no | yes | no | Replaces a page's title or content. |
 | `delete_page` | Delete page | no | yes | no | Deletes a page. |
@@ -49,10 +49,12 @@ Every tool has a title and explicit `readOnlyHint`, `destructiveHint` and `openW
 | `list_teams` | List my teams | yes | no | no | Lists the user's teams. |
 | `list_comments` | List comments | yes | no | no | Reads comments on a team page. |
 | `add_comment` | Add comment | no | no | no | Posts a comment on a team page. |
+| `get_style_guide` | Get style guide | yes | no | no | Reads a team's style guide. Team plan only. |
+| `set_style_guide` | Create or update style guide | no | yes | no | Creates a team's style guide, or replaces it if one already exists. Team plan only; any member. |
 
 ## Reviewer account
 
-A verified account with a complimentary active plan, three personal pages, an active team with a team page and a comment, so every tool can be exercised. No MFA.
+A verified account with a complimentary active plan, three personal pages, an active team with a team page, a comment and a style guide, so every tool can be exercised. No MFA.
 
 - Email: `review@canvasbin.dev`
 - Password: supplied in the submission form only. It is not stored in this repository.
@@ -66,6 +68,7 @@ A verified account with a complimentary active plan, three personal pages, an ac
 3. "Open my weekly sales dashboard on Canvasbin and add a row for Northern Ireland with £8,400 and 210 orders." Expect `get_page` then `update_page`, with the same link still working.
 4. "Publish these meeting notes as Markdown to the Review Team space: …" Expect `list_teams` then `create_page` with the team.
 5. "What comments are on the Team roadmap page? Reply that PDF export can move to October." Expect `list_comments` then `add_comment`.
+6. "Set the Review Team style guide to short sentences and British English, then publish a one-page status update to that team." Expect `set_style_guide`, then `get_style_guide` before `create_page` with the team.
 
 ### Should not use Canvasbin
 

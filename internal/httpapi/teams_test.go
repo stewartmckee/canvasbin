@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stewartmckee/canvasbin/internal/store"
@@ -29,6 +30,11 @@ func TestTeams(t *testing.T) {
 	}
 	outsider.want(404, "GET", base, nil)
 	outsider.want(404, "POST", "/api/pages", map[string]any{"content": "x", "team_id": id})
+	// Style guides are a Team plan feature, so an unsubscribed team can't use one.
+	if out := owner.want(402, "GET", base+"/style-guide", nil); out["code"] != "team_inactive" || !strings.Contains(out["error"].(string), "Team plan") {
+		t.Fatalf("inactive style guide: %v", out)
+	}
+	owner.want(402, "PUT", base+"/style-guide", map[string]string{"style_guide": "too soon"})
 
 	// Activate as the webhook would.
 	if err := e.st.UpdateTeamSubscription(context.Background(), id, store.Subscription{
@@ -48,6 +54,26 @@ func TestTeams(t *testing.T) {
 	if e.mail.get("team", memberEmail) == "" || e.mail.get("team", late) == "" {
 		t.Fatal("team invite emails not sent")
 	}
+
+	// Any member of an active team can create a style guide and update it later.
+	guide := base + "/style-guide"
+	if g := member.want(200, "GET", guide, nil); g["style_guide"] != "" || g["can_edit"] != true {
+		t.Fatalf("empty style guide: %v", g)
+	}
+	outsider.want(404, "GET", guide, nil)
+	outsider.want(404, "PUT", guide, map[string]string{"style_guide": "nope"})
+	text := "Short sentences.\nBritish English."
+	if g := member.want(200, "PUT", guide, map[string]string{"style_guide": "  " + text + "  "}); g["style_guide"] != text || g["created"] != true {
+		t.Fatalf("create style guide: %v", g)
+	}
+	updated := text + "\nNo emoji."
+	if g := owner.want(200, "PUT", guide, map[string]string{"style_guide": updated}); g["style_guide"] != updated || g["created"] != false {
+		t.Fatalf("update style guide: %v", g)
+	}
+	if g := member.want(200, "GET", guide, nil); g["style_guide"] != updated {
+		t.Fatalf("read style guide: %v", g)
+	}
+	owner.want(400, "PUT", guide, map[string]string{"style_guide": strings.Repeat("å", store.MaxStyleGuideRunes+1)})
 
 	// Team pages don't use the personal quota (1 here).
 	owner.want(201, "POST", "/api/pages", map[string]string{"content": "personal"})
@@ -101,7 +127,8 @@ func TestTeams(t *testing.T) {
 		counts[a.(map[string]any)["action"].(string)]++
 	}
 	if counts[store.ActivityPageCreated] != 1 || counts[store.ActivityPageEdited] != 1 ||
-		counts[store.ActivityCommentAdded] != 2 || counts[store.ActivityMemberJoined] != 1 || counts[store.ActivityMemberInvited] != 1 {
+		counts[store.ActivityCommentAdded] != 2 || counts[store.ActivityMemberJoined] != 1 || counts[store.ActivityMemberInvited] != 1 ||
+		counts[store.ActivityStyleGuideUpdated] != 2 {
 		t.Fatalf("activity: %v", counts)
 	}
 	pa := member.want(200, "GET", "/api/pages/"+readKey+"/activity", nil)["activity"].([]any)
@@ -136,10 +163,13 @@ func TestTeams(t *testing.T) {
 	// Leaving the team drops access even to pages you created there.
 	member.want(403, "PUT", "/api/pages/"+own, map[string]string{"content": "gone"})
 
-	// An active team can't be deleted; a lapsed one can.
+	// An active team can't be deleted; a lapsed one can. Lapsing also hides the style guide.
 	owner.want(409, "DELETE", base, nil)
 	if err := e.st.UpdateTeamSubscription(context.Background(), id, store.Subscription{Status: "canceled"}); err != nil {
 		t.Fatal(err)
+	}
+	if out := owner.want(402, "GET", base+"/style-guide", nil); out["code"] != "team_inactive" {
+		t.Fatalf("lapsed style guide: %v", out)
 	}
 	lateC.want(403, "DELETE", base, nil)
 	owner.want(204, "DELETE", base, nil)

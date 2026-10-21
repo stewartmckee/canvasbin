@@ -328,10 +328,10 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 	if st, hdr, _ := f.mcp("bogus", initBody); st != 401 || !strings.Contains(hdr.Get("WWW-Authenticate"), `error="invalid_token"`) {
 		t.Fatalf("bad token: %d %q", st, hdr.Get("WWW-Authenticate"))
 	}
-	if st, _, body := f.mcp(access, initBody); st != 200 || !strings.Contains(body, "list_pages") {
+	if st, _, body := f.mcp(access, initBody); st != 200 || !strings.Contains(body, "list_pages") || !strings.Contains(body, "get_style_guide") {
 		t.Fatalf("initialize: %d %s", st, body)
 	}
-	if st, _, body := f.mcp(access, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`); st != 200 || !strings.Contains(body, "claim_page") {
+	if st, _, body := f.mcp(access, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`); st != 200 || !strings.Contains(body, "claim_page") || !strings.Contains(body, "call get_style_guide") {
 		t.Fatalf("tools/list: %d %s", st, body)
 	}
 	// A pre-existing unowned page can still be edited by key once signed in.
@@ -374,6 +374,18 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 	// Team pages, comments and team listing over MCP.
 	if st, _, body = f.mcp(access, rpcCall("list_teams", `{}`)); st != 200 || !strings.Contains(body, "MCP team") {
 		t.Fatalf("list_teams: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("get_style_guide", `{"team":"MCP team"}`)); st != 200 || !strings.Contains(body, "style_guide") {
+		t.Fatalf("get_style_guide: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("set_style_guide", `{"team":"mcp team","style_guide":"Use short sentences."}`)); st != 200 || !strings.Contains(body, "Use short sentences.") || (!strings.Contains(body, `"created":true`) && !strings.Contains(body, `\"created\":true`)) {
+		t.Fatalf("create style guide: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("set_style_guide", `{"team":"mcp team","style_guide":"Use short sentences. No emoji."}`)); st != 200 || !strings.Contains(body, "No emoji.") || (!strings.Contains(body, `"created":false`) && !strings.Contains(body, `\"created\":false`)) {
+		t.Fatalf("update style guide: %d %s", st, body)
+	}
+	if st, _, body = f.mcp(access, rpcCall("get_style_guide", `{"team":"nope"}`)); !strings.Contains(body, "list_teams") {
+		t.Fatalf("unknown team style guide: %d %s", st, body)
 	}
 	if st, _, body = f.mcp(access, rpcCall("create_page", `{"content":"t","title":"team doc","team":"mcp team"}`)); st != 200 || strings.Contains(body, `"isError":true`) {
 		t.Fatalf("team create: %d %s", st, body)

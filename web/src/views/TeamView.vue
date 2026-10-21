@@ -7,12 +7,14 @@ import {
   cancelTeamInvite,
   deleteTeam,
   editRoute,
+  getStyleGuide,
   getTeam,
   getTeamActivity,
   getTeamPages,
   openTeamBillingPortal,
   removeTeamMember,
   renameTeam,
+  setStyleGuide,
   setTeamMemberRole,
   startTeamCheckout,
 } from '../api.js'
@@ -37,6 +39,9 @@ const busy = ref(false)
 const email = ref('')
 const role = ref('member')
 const newName = ref('')
+const styleGuide = ref('')
+const savedStyle = ref('')
+const styleMax = ref(8000)
 
 const canManage = computed(() => ['owner', 'admin'].includes(team.value?.role))
 const isOwner = computed(() => team.value?.role === 'owner')
@@ -60,9 +65,16 @@ async function load() {
     billingEnabled.value = t.billing_enabled
     newName.value = t.team.name
     document.title = `${t.team.name} · Canvasbin`
-    const [p, a] = await Promise.all([getTeamPages(props.teamId), getTeamActivity(props.teamId)])
+    const [p, a, g] = await Promise.all([
+      getTeamPages(props.teamId),
+      getTeamActivity(props.teamId),
+      t.team.active ? getStyleGuide(props.teamId) : null,
+    ])
     pages.value = p.pages
     activity.value = a.activity
+    styleGuide.value = g?.style_guide || ''
+    savedStyle.value = styleGuide.value
+    styleMax.value = g?.max_length || 8000
   } catch (e) {
     loadError.value = e.status === 404 ? 'This team does not exist or you are not a member.' : e.message
   }
@@ -123,6 +135,14 @@ const rename = () =>
   act(async () => {
     team.value = await renameTeam(props.teamId, newName.value)
     loadMe()
+  })
+
+const saveStyle = () =>
+  act(async () => {
+    const g = await setStyleGuide(props.teamId, styleGuide.value)
+    styleGuide.value = g.style_guide
+    savedStyle.value = g.style_guide
+    activity.value = (await getTeamActivity(props.teamId)).activity
   })
 
 const remove_ = () => {
@@ -206,6 +226,33 @@ const billing = (fn) =>
           </ul>
         </section>
       </div>
+
+      <section class="panel mt">
+        <h2>Style guide</h2>
+        <p class="muted">
+          Tell assistants how this team’s pages should be written. They read it before creating a team page. Style
+          guides are part of the Team plan.
+        </p>
+        <form v-if="team.active" class="style-guide-form" @submit.prevent="saveStyle">
+          <textarea
+            v-model="styleGuide"
+            class="style-guide"
+            :maxlength="styleMax"
+            aria-label="Style guide"
+            placeholder="For example: short sentences, British English, no emoji, navy and cream colours."
+          />
+          <div class="style-guide-actions">
+            <button class="btn small primary" type="submit" :disabled="busy || styleGuide === savedStyle">
+              Save style guide
+            </button>
+            <span class="muted small">{{ styleGuide.length }} / {{ styleMax }}</span>
+          </div>
+        </form>
+        <p v-else class="muted">
+          A style guide is available once the Team plan is active.
+          <RouterLink to="/pricing">See the Team plan</RouterLink>.
+        </p>
+      </section>
 
       <section class="panel mt">
         <h2>Members</h2>
