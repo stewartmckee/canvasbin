@@ -19,7 +19,7 @@ func TestPageUpdatesFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.ConfirmSubscriber(ctx, tok); err != nil {
+	if _, err := st.ConfirmSubscriber(ctx, tok); err != nil {
 		t.Fatal(err)
 	}
 	u, err := st.CreatePageUpdate(ctx, a.ID, nil, "Hello", "Body text")

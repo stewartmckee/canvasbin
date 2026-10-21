@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -133,17 +135,36 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 	if link == "" {
 		t.Fatal("no confirm email")
 	}
-	res2, err := http.Get(link)
-	if err != nil || res2.StatusCode != 200 {
-		t.Fatalf("confirm %d", res2.StatusCode)
+	page := func(url string, status int, want ...string) {
+		t.Helper()
+		res, err := http.Get(url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		if res.StatusCode != status {
+			t.Fatalf("GET %s: status %d, want %d", url, res.StatusCode, status)
+		}
+		for _, w := range want {
+			if !strings.Contains(string(b), w) {
+				t.Errorf("GET %s: page missing %q", url, w)
+			}
+		}
 	}
+	page(link, 200, "You’re subscribed", "<strong>Site</strong>", "fan@example.com", "/"+a.ReadKey+".html")
+	page(link, 200, "You’re subscribed")
+	page(srv.URL+"/api/subscribe/confirm?token=nope", 400, "isn’t valid")
 	postBody, _ := json.Marshal(map[string]string{"title": "News", "body": "Details"})
 	res3, err := http.Post(srv.URL+"/api/pages/"+a.WriteKey+"/updates", "application/json", bytes.NewReader(postBody))
 	if err != nil || res3.StatusCode != 201 {
 		t.Fatalf("post update %d", res3.StatusCode)
 	}
 	s.processOutbox(context.Background())
-	if m.get("notify", "fan@example.com") == "" {
+	sent := m.get("notify", "fan@example.com")
+	if sent == "" {
 		t.Fatal("expected notification email")
 	}
+	unsub := sent[strings.Index(sent, "/api/unsubscribe"):]
+	page(srv.URL+unsub, 200, "You’re unsubscribed", "<strong>Site</strong>")
 }

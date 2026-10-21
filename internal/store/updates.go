@@ -178,33 +178,42 @@ func (s *Store) SubscribePage(ctx context.Context, pageID int64, email string) (
 	return confirmToken, err
 }
 
-// ConfirmSubscriber activates a pending subscription.
-func (s *Store) ConfirmSubscriber(ctx context.Context, token string) error {
-	tag, err := s.db.Exec(ctx,
-		`UPDATE page_update_subscribers SET status = $2, confirmed_at = now()
-		 WHERE confirm_token = $1 AND status = $3`,
-		token, SubscriberActive, SubscriberPending)
-	if err != nil {
-		return err
+// SubscriptionPage describes the page a subscription link belongs to.
+type SubscriptionPage struct {
+	Title   string
+	ReadKey string // empty for pages that don't keep their read key
+	Email   string
+}
+
+// ConfirmSubscriber activates a pending subscription. Confirming again is
+// harmless; an unsubscribed address isn't brought back by an old link.
+func (s *Store) ConfirmSubscriber(ctx context.Context, token string) (SubscriptionPage, error) {
+	var out SubscriptionPage
+	err := s.db.QueryRow(ctx,
+		`UPDATE page_update_subscribers s SET status = $2, confirmed_at = COALESCE(s.confirmed_at, now())
+		 FROM pages p
+		 WHERE s.confirm_token = $1 AND s.status IN ($2, $3) AND p.id = s.page_id
+		 RETURNING p.title, COALESCE(p.read_key, ''), s.email`,
+		token, SubscriberActive, SubscriberPending).Scan(&out.Title, &out.ReadKey, &out.Email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return out, ErrInvalidToken
 	}
-	if tag.RowsAffected() == 0 {
-		return ErrInvalidToken
-	}
-	return nil
+	return out, err
 }
 
 // UnsubscribeByToken marks a subscriber unsubscribed (one step).
-func (s *Store) UnsubscribeByToken(ctx context.Context, token string) (pageTitle string, err error) {
-	err = s.db.QueryRow(ctx,
+func (s *Store) UnsubscribeByToken(ctx context.Context, token string) (SubscriptionPage, error) {
+	var out SubscriptionPage
+	err := s.db.QueryRow(ctx,
 		`UPDATE page_update_subscribers s SET status = $2
 		 FROM pages p
 		 WHERE s.unsubscribe_token = $1 AND p.id = s.page_id
-		 RETURNING p.title`,
-		token, SubscriberUnsubscribed).Scan(&pageTitle)
+		 RETURNING p.title, COALESCE(p.read_key, ''), s.email`,
+		token, SubscriberUnsubscribed).Scan(&out.Title, &out.ReadKey, &out.Email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", ErrInvalidToken
+		return out, ErrInvalidToken
 	}
-	return pageTitle, err
+	return out, err
 }
 
 // ListActiveSubscribers returns rows for notification fan-out.

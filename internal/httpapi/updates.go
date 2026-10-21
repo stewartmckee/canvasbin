@@ -168,17 +168,20 @@ func (s *Server) confirmSubscribe(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	tok := strings.TrimSpace(r.URL.Query().Get("token"))
-	if tok == "" {
-		http.Error(w, "invalid link", http.StatusBadRequest)
+	sub, err := s.Store.ConfirmSubscriber(r.Context(), strings.TrimSpace(r.URL.Query().Get("token")))
+	if err != nil {
+		s.writeNotice(w, r, http.StatusBadRequest, render.Notice{
+			Kind: "error", Title: "Link not valid",
+			Heading: "This link isn’t valid",
+			Message: "It may have expired or already been used to unsubscribe. Subscribe again from the page to get a new confirmation email.",
+		}, store.SubscriptionPage{})
 		return
 	}
-	if err := s.Store.ConfirmSubscriber(r.Context(), tok); err != nil {
-		http.Error(w, "invalid or expired link", http.StatusBadRequest)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte("<!doctype html><html><body><p>Subscription confirmed. You will receive emails when new updates are posted.</p></body></html>"))
+	s.writeNotice(w, r, http.StatusOK, render.Notice{
+		Kind: "success", Title: "Subscribed",
+		Heading: "You’re subscribed",
+		Message: "We’ll email you whenever a new update is posted on",
+	}, sub)
 }
 
 func (s *Server) unsubscribePage(w http.ResponseWriter, r *http.Request) {
@@ -186,22 +189,40 @@ func (s *Server) unsubscribePage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	tok := strings.TrimSpace(r.URL.Query().Get("token"))
-	if tok == "" {
-		http.Error(w, "invalid link", http.StatusBadRequest)
+	sub, err := s.Store.UnsubscribeByToken(r.Context(), strings.TrimSpace(r.URL.Query().Get("token")))
+	if err != nil {
+		s.writeNotice(w, r, http.StatusBadRequest, render.Notice{
+			Kind: "error", Title: "Link not valid",
+			Heading: "This link isn’t valid",
+			Message: "We couldn’t find a subscription for this link. If you’re still getting emails, use the unsubscribe link in the latest one.",
+		}, store.SubscriptionPage{})
 		return
 	}
-	title, err := s.Store.UnsubscribeByToken(r.Context(), tok)
-	if err != nil {
-		http.Error(w, "invalid link", http.StatusBadRequest)
-		return
+	s.writeNotice(w, r, http.StatusOK, render.Notice{
+		Kind: "neutral", Title: "Unsubscribed",
+		Heading: "You’re unsubscribed",
+		Message: "You won’t get any more update emails for",
+	}, sub)
+}
+
+// writeNotice renders a standalone notice page, adding the subscription's
+// page title, email and a link back to the page when known.
+func (s *Server) writeNotice(w http.ResponseWriter, r *http.Request, status int, n render.Notice, sub store.SubscriptionPage) {
+	n.Product = s.Config.ProductNameOrDefault()
+	n.Email = sub.Email
+	if sub.Title != "" {
+		n.PageTitle = sub.Title
+	} else if sub.Email != "" {
+		n.PageTitle = "this page"
+	}
+	if sub.ReadKey != "" {
+		n.LinkURL = s.baseURL(r) + "/" + sub.ReadKey + ".html"
+		n.LinkText = "View the page"
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	msg := "You have been unsubscribed."
-	if title != "" {
-		msg = "You have been unsubscribed from updates for " + title + "."
-	}
-	_, _ = w.Write([]byte("<!doctype html><html><body><p>" + msg + "</p></body></html>"))
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(render.NoticePage(n)))
 }
 
 type postUpdateInput struct {
