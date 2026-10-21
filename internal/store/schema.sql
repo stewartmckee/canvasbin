@@ -230,6 +230,18 @@ CREATE TABLE IF NOT EXISTS page_updates (
 
 CREATE INDEX IF NOT EXISTS page_updates_page_idx ON page_updates (page_id, created_at DESC, id DESC);
 
+-- Scheduled updates stay hidden until published_at; notified_at is set once
+-- their emails are queued. Rows that predate scheduling count as notified.
+ALTER TABLE page_updates ADD COLUMN IF NOT EXISTS published_at timestamptz;
+UPDATE page_updates SET published_at = created_at WHERE published_at IS NULL;
+ALTER TABLE page_updates ALTER COLUMN published_at SET DEFAULT now();
+ALTER TABLE page_updates ALTER COLUMN published_at SET NOT NULL;
+ALTER TABLE page_updates ADD COLUMN IF NOT EXISTS notified_at timestamptz DEFAULT now();
+ALTER TABLE page_updates ALTER COLUMN notified_at DROP DEFAULT;
+ALTER TABLE page_updates ADD COLUMN IF NOT EXISTS read_key text NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS page_updates_published_idx ON page_updates (page_id, published_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS page_updates_due_idx ON page_updates (published_at) WHERE notified_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS page_update_subscribers (
     id                bigserial PRIMARY KEY,
     page_id           bigint      NOT NULL REFERENCES pages(id) ON DELETE CASCADE,

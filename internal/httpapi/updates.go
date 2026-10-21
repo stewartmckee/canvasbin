@@ -226,8 +226,9 @@ func (s *Server) writeNotice(w http.ResponseWriter, r *http.Request, status int,
 }
 
 type postUpdateInput struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
+	Title     string     `json:"title"`
+	Body      string     `json:"body"`
+	PublishAt *time.Time `json:"publish_at"`
 }
 
 func (s *Server) createPageUpdate(w http.ResponseWriter, r *http.Request) {
@@ -256,12 +257,18 @@ func (s *Server) createPageUpdate(w http.ResponseWriter, r *http.Request) {
 	if u := s.SessionUser(r); u != nil {
 		uid = &u.ID
 	}
-	u, err := s.Store.CreatePageUpdate(r.Context(), a.ID, uid, in.Title, in.Body)
+	var at time.Time
+	if in.PublishAt != nil {
+		at = *in.PublishAt
+	}
+	u, err := s.Store.CreatePageUpdate(r.Context(), a.ID, uid, in.Title, in.Body, a.ReadKey, at)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	s.enqueueUpdateEmails(r.Context(), u, a.ReadKey)
+	if !u.Scheduled {
+		s.enqueueUpdateEmails(r.Context(), u, a.ReadKey)
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{"update": u})
 }
 
@@ -315,18 +322,50 @@ func (s *Server) enqueueUpdateEmails(ctx context.Context, u *store.PageUpdate, r
 }
 
 // RunUpdateOutboxWorker sends pending notification emails until ctx is cancelled.
+// It also publishes scheduled updates once they're due, even without a mailer,
+// so they aren't all emailed late if one is configured afterwards.
 func (s *Server) RunUpdateOutboxWorker(ctx context.Context) {
-	if !s.updatesOn() || s.Mailer == nil {
+	if !s.updatesOn() {
 		return
 	}
 	t := time.NewTicker(15 * time.Second)
 	defer t.Stop()
 	for {
-		s.processOutbox(ctx)
+		s.publishDueUpdates(ctx)
+		if s.Mailer != nil {
+			s.processOutbox(ctx)
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+		}
+	}
+}
+
+// publishDueUpdates queues emails for scheduled updates whose time has come,
+// skipping pages that no longer show updates.
+func (s *Server) publishDueUpdates(ctx context.Context) {
+	for {
+		due, err := s.Store.ClaimDueUpdates(ctx, 20)
+		if err != nil {
+			slog.Error("claim scheduled updates", "err", err)
+			return
+		}
+		if len(due) == 0 {
+			return
+		}
+		for _, d := range due {
+			if s.Mailer == nil {
+				continue
+			}
+			a, err := s.Store.GetByID(ctx, d.PageID)
+			if err != nil || !s.pageUpdatesLive(ctx, a) {
+				continue
+			}
+			if _, err := s.Store.EnqueueUpdateNotifications(ctx, d.ID, d.PageID, d.ReadKey); err != nil {
+				slog.Error("enqueue scheduled update", "err", err, "update", d.ID)
+			}
 		}
 	}
 }
@@ -399,7 +438,7 @@ func (s *Server) NotifyPageEditSubscribers(ctx context.Context, a *store.Access,
 	if title == "" {
 		title = "Page updated"
 	}
-	u, err := s.Store.CreatePageUpdate(ctx, a.ID, nil, title, "The page has been updated.")
+	u, err := s.Store.CreatePageUpdate(ctx, a.ID, nil, title, "The page has been updated.", a.ReadKey, time.Time{})
 	if err != nil {
 		slog.Error("notify page edit", "err", err)
 		return

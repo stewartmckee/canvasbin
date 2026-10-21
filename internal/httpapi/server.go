@@ -693,7 +693,7 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, store.ErrInvalidToken), errors.Is(err, store.ErrBadTeamName),
 		errors.Is(err, store.ErrBadTeamRole), errors.Is(err, store.ErrBadComment),
-		errors.Is(err, store.ErrStyleGuideTooLong):
+		errors.Is(err, store.ErrStyleGuideTooLong), errors.Is(err, store.ErrBadSchedule):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, store.ErrTeamInactive):
 		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": err.Error(), "code": "team_inactive"})

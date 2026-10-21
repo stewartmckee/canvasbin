@@ -46,8 +46,8 @@ func TestWithUpdatesNoBody(t *testing.T) {
 func TestUpdatesBlockFoldsOlder(t *testing.T) {
 	at := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
 	out, err := UpdatesBlock("k", []store.PageUpdate{
-		{ID: 2, Title: "New", Body: "b", CreatedAt: at},
-		{ID: 1, Title: "Old", Body: "a", CreatedAt: at},
+		{ID: 2, Title: "New", Body: "b", CreatedAt: at, PublishedAt: at},
+		{ID: 1, Title: "Old", Body: "a", CreatedAt: at, PublishedAt: at},
 	}, "Canvasbin")
 	if err != nil {
 		t.Fatal(err)

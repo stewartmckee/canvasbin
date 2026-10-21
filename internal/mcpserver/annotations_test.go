@@ -85,7 +85,7 @@ func TestUpdateInstructionsRequireReview(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := strings.Contains(cs.InitializeResult().Instructions, "ask them to confirm"); got != on {
+		if got := strings.Contains(cs.InitializeResult().Instructions, "publish it now or schedule it"); got != on {
 			t.Errorf("updates=%v: review instruction present = %v", on, got)
 		}
 		res, err := cs.ListTools(ctx, nil)

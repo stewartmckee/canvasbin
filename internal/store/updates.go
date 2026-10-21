@@ -16,21 +16,35 @@ const (
 	SubscriberUnsubscribed = "unsubscribed"
 
 	MaxUpdateBodyBytes = 64 << 10
+
+	// MaxUpdateSchedule is how far ahead an update can be scheduled.
+	MaxUpdateSchedule = 366 * 24 * time.Hour
+	// A publish time this close to now (or slightly past it) means "now".
+	updateScheduleSlack = time.Minute
 )
 
 var (
 	ErrUpdatesDisabled   = errors.New("updates are not enabled for this page")
 	ErrUpdatesOff        = errors.New("updates feature is not available")
 	ErrAlreadySubscribed = errors.New("already subscribed")
+	ErrBadSchedule       = errors.New("publish time must be in the future and within a year")
 )
 
 // PageUpdate is one append-only post on a page.
 type PageUpdate struct {
-	ID        int64     `json:"id"`
-	PageID    int64     `json:"-"`
-	Title     string    `json:"title"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int64     `json:"id"`
+	PageID      int64     `json:"-"`
+	Title       string    `json:"title"`
+	Body        string    `json:"body"`
+	CreatedAt   time.Time `json:"created_at"`
+	PublishedAt time.Time `json:"published_at"`
+	Scheduled   bool      `json:"scheduled"`
+}
+
+const updateCols = `id, page_id, title, body, created_at, published_at, published_at > now()`
+
+func scanUpdate(row pgx.Row, u *PageUpdate) error {
+	return row.Scan(&u.ID, &u.PageID, &u.Title, &u.Body, &u.CreatedAt, &u.PublishedAt, &u.Scheduled)
 }
 
 // SetUpdatesEnabled toggles public updates for a page.
@@ -75,11 +89,23 @@ func cleanUpdate(title, body string) (string, string, error) {
 	return title, body, nil
 }
 
-// CreatePageUpdate inserts a post and bumps the page updated_at for live reload.
-func (s *Store) CreatePageUpdate(ctx context.Context, pageID int64, userID *int64, title, body string) (*PageUpdate, error) {
+// CreatePageUpdate inserts a post. A zero publishAt (or one within a minute of
+// now) publishes immediately: the caller queues the emails and the page's
+// updated_at is bumped for live reload. A later publishAt keeps the update
+// hidden until then, and ClaimDueUpdates hands it over for emailing.
+// readKey is kept so scheduled emails can link to pages that don't store it.
+func (s *Store) CreatePageUpdate(ctx context.Context, pageID int64, userID *int64, title, body, readKey string, publishAt time.Time) (*PageUpdate, error) {
 	title, body, err := cleanUpdate(title, body)
 	if err != nil {
 		return nil, err
+	}
+	scheduled := false
+	if !publishAt.IsZero() {
+		d := time.Until(publishAt)
+		if d < -updateScheduleSlack || d > MaxUpdateSchedule {
+			return nil, ErrBadSchedule
+		}
+		scheduled = d > updateScheduleSlack
 	}
 	on, err := s.UpdatesEnabled(ctx, pageID)
 	if err != nil {
@@ -89,28 +115,24 @@ func (s *Store) CreatePageUpdate(ctx context.Context, pageID int64, userID *int6
 		return nil, ErrUpdatesDisabled
 	}
 	var u PageUpdate
-	err = s.db.QueryRow(ctx,
-		`INSERT INTO page_updates (page_id, title, body, created_by_user_id)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, page_id, title, body, created_at`,
-		pageID, title, body, userID,
-	).Scan(&u.ID, &u.PageID, &u.Title, &u.Body, &u.CreatedAt)
+	err = scanUpdate(s.db.QueryRow(ctx,
+		`INSERT INTO page_updates (page_id, title, body, created_by_user_id, read_key, published_at, notified_at)
+		 SELECT $1, $2, $3, $4, $5, t, CASE WHEN $7 THEN NULL ELSE now() END
+		 FROM (SELECT CASE WHEN $7 THEN $6::timestamptz ELSE now() END AS t) x
+		 RETURNING `+updateCols,
+		pageID, title, body, userID, readKey, publishAt, scheduled,
+	), &u)
 	if err != nil {
 		return nil, err
 	}
-	_, _ = s.db.Exec(ctx, `UPDATE pages SET updated_at = now() WHERE id = $1`, pageID)
+	if !scheduled {
+		_, _ = s.db.Exec(ctx, `UPDATE pages SET updated_at = now() WHERE id = $1`, pageID)
+	}
 	return &u, nil
 }
 
-// ListPageUpdates returns posts newest first.
-func (s *Store) ListPageUpdates(ctx context.Context, pageID int64, limit int) ([]PageUpdate, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-	rows, err := s.db.Query(ctx,
-		`SELECT id, page_id, title, body, created_at
-		 FROM page_updates WHERE page_id = $1
-		 ORDER BY created_at DESC, id DESC LIMIT $2`, pageID, limit)
+func (s *Store) listUpdates(ctx context.Context, q string, args ...any) ([]PageUpdate, error) {
+	rows, err := s.db.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +140,87 @@ func (s *Store) ListPageUpdates(ctx context.Context, pageID int64, limit int) ([
 	var out []PageUpdate
 	for rows.Next() {
 		var u PageUpdate
-		if err := rows.Scan(&u.ID, &u.PageID, &u.Title, &u.Body, &u.CreatedAt); err != nil {
+		if err := scanUpdate(rows, &u); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// ListPageUpdates returns published posts newest first.
+func (s *Store) ListPageUpdates(ctx context.Context, pageID int64, limit int) ([]PageUpdate, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return s.listUpdates(ctx,
+		`SELECT `+updateCols+` FROM page_updates WHERE page_id = $1 AND published_at <= now()
+		 ORDER BY published_at DESC, id DESC LIMIT $2`, pageID, limit)
+}
+
+// ListScheduledUpdates returns posts waiting to be published, soonest first.
+func (s *Store) ListScheduledUpdates(ctx context.Context, pageID int64) ([]PageUpdate, error) {
+	return s.listUpdates(ctx,
+		`SELECT `+updateCols+` FROM page_updates WHERE page_id = $1 AND published_at > now()
+		 ORDER BY published_at, id LIMIT 100`, pageID)
+}
+
+// CancelScheduledUpdate deletes an update that hasn't been published yet.
+func (s *Store) CancelScheduledUpdate(ctx context.Context, pageID, updateID int64) error {
+	tag, err := s.db.Exec(ctx,
+		`DELETE FROM page_updates WHERE id = $1 AND page_id = $2 AND published_at > now() AND notified_at IS NULL`,
+		updateID, pageID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DueUpdate is a scheduled update whose publish time has passed.
+type DueUpdate struct {
+	ID      int64
+	PageID  int64
+	ReadKey string
+}
+
+// ClaimDueUpdates marks published scheduled updates as notified and returns
+// them so the caller can queue their emails. It also bumps each page's
+// updated_at so open pages reload and show the update.
+func (s *Store) ClaimDueUpdates(ctx context.Context, limit int) ([]DueUpdate, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	rows, err := s.db.Query(ctx,
+		`WITH due AS (
+		   SELECT id FROM page_updates
+		   WHERE notified_at IS NULL AND published_at <= now()
+		   ORDER BY published_at, id LIMIT $1
+		   FOR UPDATE SKIP LOCKED
+		 ), claimed AS (
+		   UPDATE page_updates u SET notified_at = now()
+		   FROM due WHERE u.id = due.id
+		   RETURNING u.id, u.page_id, u.read_key
+		 ), bumped AS (
+		   UPDATE pages p SET updated_at = now()
+		   WHERE p.id IN (SELECT page_id FROM claimed)
+		   RETURNING p.id, COALESCE(p.read_key, '') AS read_key
+		 )
+		 SELECT c.id, c.page_id, COALESCE(NULLIF(c.read_key, ''), b.read_key, '')
+		 FROM claimed c LEFT JOIN bumped b ON b.id = c.page_id`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DueUpdate
+	for rows.Next() {
+		var d DueUpdate
+		if err := rows.Scan(&d.ID, &d.PageID, &d.ReadKey); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
 	}
 	return out, rows.Err()
 }

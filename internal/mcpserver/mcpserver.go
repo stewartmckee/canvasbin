@@ -306,7 +306,7 @@ func (t *tools) maybeNotifyPageEdit(ctx context.Context, a *store.Access, notify
 	if title == "" {
 		title = "Page updated"
 	}
-	u, err := t.Store.CreatePageUpdate(ctx, a.ID, nil, title, "The page has been updated.")
+	u, err := t.Store.CreatePageUpdate(ctx, a.ID, nil, title, "The page has been updated.", a.ReadKey, time.Time{})
 	if err != nil {
 		return
 	}

@@ -69,8 +69,8 @@ func UpdatesBlock(readKey string, updates []store.PageUpdate, productName string
 		}
 		title := html.EscapeString(u.Title)
 		when := fmt.Sprintf(`<time datetime="%s">%s</time>`,
-			html.EscapeString(u.CreatedAt.UTC().Format(time.RFC3339)),
-			html.EscapeString(u.CreatedAt.UTC().Format("2 Jan 2006")))
+			html.EscapeString(u.PublishedAt.UTC().Format(time.RFC3339)),
+			html.EscapeString(u.PublishedAt.UTC().Format("2 Jan 2006")))
 		switch i {
 		case 0:
 			fmt.Fprintf(&b, `<article class="latest" id="update-%d"><p class="eyebrow"><span class="dot"></span>Latest update · %s</p><h3>%s</h3><div class="body">%s</div></article>`,
