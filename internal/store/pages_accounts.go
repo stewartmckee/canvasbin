@@ -12,17 +12,18 @@ import (
 
 // PageSummary is one row of a user's library.
 type PageSummary struct {
-	ID         int64     `json:"-"`
-	Title      string    `json:"title"`
-	Format     string    `json:"format"`
-	ReadKey    string    `json:"read_key"`
-	Role       string    `json:"role"` // owner, editor or viewer
-	CanWrite   bool      `json:"can_write"`
-	OwnerEmail string    `json:"owner_email,omitempty"`
-	TeamID     *int64    `json:"team_id,omitempty"`
-	TeamName   string    `json:"team_name,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID          int64     `json:"-"`
+	Title       string    `json:"title"`
+	Format      string    `json:"format"`
+	ReadKey     string    `json:"read_key"`
+	Role        string    `json:"role"` // owner, editor or viewer
+	CanWrite    bool      `json:"can_write"`
+	AgenticOnly bool      `json:"agentic_only"`
+	OwnerEmail  string    `json:"owner_email,omitempty"`
+	TeamID      *int64    `json:"team_id,omitempty"`
+	TeamName    string    `json:"team_name,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // GetForUser looks a page up by key as a signed-in user. Write access is granted
@@ -38,14 +39,14 @@ func (s *Store) GetForUser(ctx context.Context, key string, userID int64) (*Acce
 		noReadKey  bool
 	)
 	err := s.db.QueryRow(ctx,
-		`SELECT p.id, p.owner_id, p.team_id, p.title, p.format, p.content, p.created_at, p.updated_at,
+		`SELECT p.id, p.owner_id, p.team_id, p.title, p.format, p.content, p.agentic_only, p.created_at, p.updated_at,
 		        p.write_key_hash = $1, s.role, tm.role, COALESCE(t.name, ''), p.read_key IS NULL
 		 FROM pages p
 		 LEFT JOIN page_shares s ON s.page_id = p.id AND s.user_id = $2
 		 LEFT JOIN team_members tm ON tm.team_id = p.team_id AND tm.user_id = $2
 		 LEFT JOIN teams t ON t.id = p.team_id
 		 WHERE p.read_key_hash = $1 OR p.write_key_hash = $1`, h, userID,
-	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt,
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt,
 		&isWriteKey, &role, &teamRole, &a.TeamName, &noReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -105,9 +106,9 @@ func (s *Store) backfillReadKey(ctx context.Context, a *Access) {
 func (s *Store) GetByID(ctx context.Context, id int64) (*Access, error) {
 	var a Access
 	err := s.db.QueryRow(ctx,
-		`SELECT id, owner_id, team_id, title, format, content, created_at, updated_at, COALESCE(read_key, '')
+		`SELECT id, owner_id, team_id, title, format, content, agentic_only, created_at, updated_at, COALESCE(read_key, '')
 		 FROM pages WHERE id = $1`, id,
-	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt, &a.ReadKey)
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt, &a.ReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -164,13 +165,16 @@ func (s *Store) UpdateByID(ctx context.Context, id int64, c Changes) error {
 		t := cleanTitle(*c.Title)
 		c.Title = &t
 	}
+	clearTeam := c.AgenticOnly != nil && *c.AgenticOnly
 	tag, err := s.db.Exec(ctx,
 		`UPDATE pages SET
 		   title = COALESCE($2, title),
 		   format = COALESCE($3, format),
 		   content = COALESCE($4, content),
+		   agentic_only = COALESCE($5, agentic_only),
+		   team_id = CASE WHEN $6 THEN NULL ELSE team_id END,
 		   updated_at = now()
-		 WHERE id = $1`, id, c.Title, c.Format, c.Content)
+		 WHERE id = $1`, id, c.Title, c.Format, c.Content, c.AgenticOnly, clearTeam)
 	if err != nil {
 		return err
 	}
@@ -240,18 +244,20 @@ func (s *Store) CountCreated(ctx context.Context, userID int64) (int, error) {
 }
 
 // ListOwnedAndShared returns every page the user owns, has been shared, or can
-// reach through a team, newest first.
-func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64) ([]PageSummary, error) {
+// reach through a team, newest first. When includeAgentic is false, agentic-only
+// scratchpads are omitted (the default for the web library).
+func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64, includeAgentic bool) ([]PageSummary, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT p.id, p.owner_id, p.team_id, COALESCE(t.name, ''), p.title, p.format, COALESCE(p.read_key, ''),
-		        s.role, COALESCE(tm.role, ''), COALESCE(o.email, ''), p.created_at, p.updated_at
+		        s.role, COALESCE(tm.role, ''), COALESCE(o.email, ''), p.agentic_only, p.created_at, p.updated_at
 		 FROM pages p
 		 LEFT JOIN page_shares s ON s.page_id = p.id AND s.user_id = $1
 		 LEFT JOIN team_members tm ON tm.team_id = p.team_id AND tm.user_id = $1
 		 LEFT JOIN teams t ON t.id = p.team_id
 		 LEFT JOIN users o ON o.id = p.owner_id
-		 WHERE (p.owner_id = $1 AND p.team_id IS NULL) OR s.user_id = $1 OR tm.user_id = $1
-		 ORDER BY p.updated_at DESC`, userID)
+		 WHERE ((p.owner_id = $1 AND p.team_id IS NULL) OR s.user_id = $1 OR (tm.user_id = $1 AND p.team_id IS NOT NULL))
+		   AND ($2 OR NOT p.agentic_only)
+		 ORDER BY p.updated_at DESC`, userID, includeAgentic)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +271,7 @@ func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64) ([]PageSum
 			teamRole  string
 		)
 		if err := rows.Scan(&p.ID, &ownerID, &p.TeamID, &p.TeamName, &p.Title, &p.Format, &p.ReadKey,
-			&shareRole, &teamRole, &p.OwnerEmail, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			&shareRole, &teamRole, &p.OwnerEmail, &p.AgenticOnly, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		p.Role = pageRole(userID, ownerID, p.TeamID, teamRole, shareRole)
@@ -283,7 +289,7 @@ func (s *Store) ListOwnedAndShared(ctx context.Context, userID int64) ([]PageSum
 
 // ListTeamPages returns a team's pages, newest first, for a member.
 func (s *Store) ListTeamPages(ctx context.Context, teamID, userID int64) ([]PageSummary, error) {
-	all, err := s.ListOwnedAndShared(ctx, userID)
+	all, err := s.ListOwnedAndShared(ctx, userID, true)
 	if err != nil {
 		return nil, err
 	}

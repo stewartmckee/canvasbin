@@ -10,8 +10,10 @@ import { forgetPage, pruneRecent, recentPages } from '../recent.js'
 
 const router = useRouter()
 const route = useRoute()
+const SHOW_AGENTIC_KEY = 'canvasbin.showAgentic'
 const library = ref([])
 const loaded = ref(false)
+const showAgentic = ref(localStorage.getItem(SHOW_AGENTIC_KEY) === '1')
 const loadError = ref('')
 const openInput = ref('')
 const openError = ref('')
@@ -51,12 +53,18 @@ const showUpgrade = computed(() => {
 
 async function loadLibrary() {
   try {
-    library.value = (await getLibrary()).pages || []
+    library.value = (await getLibrary({ includeAgentic: showAgentic.value })).pages || []
   } catch (e) {
     loadError.value = e.message
   } finally {
     loaded.value = true
   }
+}
+
+function toggleShowAgentic() {
+  localStorage.setItem(SHOW_AGENTIC_KEY, showAgentic.value ? '1' : '0')
+  loaded.value = false
+  loadLibrary()
 }
 
 onMounted(async () => {
@@ -94,10 +102,16 @@ function formatDate(s) {
           {{ auth.me.page_count }} of {{ auth.me.quota }} personal pages used on the {{ planName(auth.me.plan) }} plan.
         </p>
       </div>
-      <RouterLink v-if="verified" to="/new" class="btn primary">Create new page</RouterLink>
-      <button v-else type="button" class="btn primary" disabled title="Verify your email address to create pages">
-        Create new page
-      </button>
+      <span class="notice-actions">
+        <label class="scratchpad-toggle muted small">
+          <input v-model="showAgentic" type="checkbox" @change="toggleShowAgentic" />
+          Show agent scratchpads
+        </label>
+        <RouterLink v-if="verified" to="/new" class="btn primary">Create new page</RouterLink>
+        <button v-else type="button" class="btn primary" disabled title="Verify your email address to create pages">
+          Create new page
+        </button>
+      </span>
     </section>
 
     <p v-if="notice" class="notice">{{ notice }}</p>
@@ -142,6 +156,7 @@ function formatDate(s) {
         <li v-for="(p, i) in owned" :key="p.read_key || `nokey-${i}`">
           <template v-if="p.read_key">
             <RouterLink :to="editRoute(p.read_key)">{{ p.title || 'Untitled' }}</RouterLink>
+            <span v-if="p.agentic_only" class="badge">Scratchpad</span>
             <a :href="p.html_url" class="small" target="_blank" rel="noopener noreferrer">View</a>
             <span class="muted small">{{ formatDate(p.updated_at) }}</span>
             <CopyLinkButton :url="p.html_url" />

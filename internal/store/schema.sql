@@ -16,6 +16,7 @@ ALTER TABLE pages ADD COLUMN IF NOT EXISTS owner_id bigint;
 -- Only set for owned pages: lets an owner's library link back to a page. The
 -- read key is a read-only bearer link, so retaining it is a deliberate tradeoff.
 ALTER TABLE pages ADD COLUMN IF NOT EXISTS read_key text;
+ALTER TABLE pages ADD COLUMN IF NOT EXISTS agentic_only boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS users (
     id                     bigserial PRIMARY KEY,

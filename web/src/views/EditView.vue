@@ -181,6 +181,10 @@ async function remove() {
     </div>
     <template v-else-if="page">
       <SharePanel :page="page" :fresh="fresh" />
+      <p v-if="page.agentic_only" class="notice">
+        <span class="badge">Agent scratchpad</span>
+        Hidden from your library unless you turn on “Show agent scratchpads” on the Pages screen.
+      </p>
       <p v-if="showSignIn()" class="notice claim">
         Shared with you to edit?
         <RouterLink class="btn small" :to="signInRoute()">Sign in</RouterLink>

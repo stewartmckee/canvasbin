@@ -22,6 +22,7 @@ const year = new Date().getFullYear()
           <RouterLink to="/features">Features</RouterLink>
           <RouterLink to="/pricing">Pricing</RouterLink>
           <RouterLink to="/use-cases">Use cases</RouterLink>
+          <RouterLink to="/agent-scratchpad">Agent scratchpad</RouterLink>
           <RouterLink v-if="!currentUser" to="/login">Sign in</RouterLink>
           <RouterLink v-else to="/account">Account</RouterLink>
         </div>

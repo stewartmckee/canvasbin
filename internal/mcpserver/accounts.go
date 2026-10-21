@@ -39,19 +39,20 @@ Style guides are a Team plan feature. Before create_page into a team, call get_s
 type ListPagesInput struct{}
 
 type PageSummary struct {
-	Title      string    `json:"title"`
-	Format     string    `json:"format"`
-	Role       string    `json:"role" jsonschema:"owner, editor or viewer"`
-	CanWrite   bool      `json:"can_write"`
-	OwnerEmail string    `json:"owner_email,omitempty"`
-	Team       string    `json:"team,omitempty" jsonschema:"name of the team the page belongs to, if any"`
-	ReadKey    string    `json:"read_key"`
-	ReadURL    string    `json:"read_url"`
-	HTMLURL    string    `json:"html_url"`
-	PDFURL     string    `json:"pdf_url"`
-	RawURL     string    `json:"raw_url"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	Title       string    `json:"title"`
+	Format      string    `json:"format"`
+	Role        string    `json:"role" jsonschema:"owner, editor or viewer"`
+	CanWrite    bool      `json:"can_write"`
+	AgenticOnly bool      `json:"agentic_only"`
+	OwnerEmail  string    `json:"owner_email,omitempty"`
+	Team        string    `json:"team,omitempty" jsonschema:"name of the team the page belongs to, if any"`
+	ReadKey     string    `json:"read_key"`
+	ReadURL     string    `json:"read_url"`
+	HTMLURL     string    `json:"html_url"`
+	PDFURL      string    `json:"pdf_url"`
+	RawURL      string    `json:"raw_url"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type ListPagesResult struct {
@@ -383,7 +384,7 @@ func (t *tools) list(ctx context.Context, _ *mcp.CallToolRequest, _ ListPagesInp
 	if err := t.requireUser(); err != nil {
 		return nil, ListPagesResult{}, err
 	}
-	pages, err := t.Store.ListOwnedAndShared(ctx, t.user.ID)
+	pages, err := t.Store.ListOwnedAndShared(ctx, t.user.ID, true)
 	if err != nil {
 		return nil, ListPagesResult{}, err
 	}
@@ -394,7 +395,8 @@ func (t *tools) list(ctx context.Context, _ *mcp.CallToolRequest, _ ListPagesInp
 			out.Owned++
 		}
 		out.Pages = append(out.Pages, PageSummary{
-			Title: p.Title, Format: p.Format, Role: p.Role, CanWrite: p.CanWrite, OwnerEmail: p.OwnerEmail, Team: p.TeamName,
+			Title: p.Title, Format: p.Format, Role: p.Role, CanWrite: p.CanWrite, AgenticOnly: p.AgenticOnly,
+			OwnerEmail: p.OwnerEmail, Team: p.TeamName,
 			ReadKey: p.ReadKey, ReadURL: l.ReadURL, HTMLURL: l.HTMLURL, PDFURL: l.PDFURL, RawURL: l.RawURL,
 			CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt,
 		})

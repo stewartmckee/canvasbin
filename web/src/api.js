@@ -44,7 +44,10 @@ export const forgotPassword = (email) => request('POST', '/api/forgot-password',
 export const resetPassword = (token, password) => request('POST', '/api/reset-password', { token, password })
 
 // Library, claiming and sharing
-export const getLibrary = () => request('GET', '/api/library')
+export const getLibrary = (opts = {}) => {
+  const q = opts.includeAgentic ? '?include_agentic=1' : ''
+  return request('GET', `/api/library${q}`)
+}
 export const claimPage = (key) => request('POST', '/api/pages/claim', { key })
 const sharesPath = (key) => `/api/pages/${encodeURIComponent(key)}/shares`
 export const listShares = (key) => request('GET', sharesPath(key))

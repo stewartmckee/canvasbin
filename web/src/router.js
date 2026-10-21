@@ -18,6 +18,8 @@ import PrivacyView from './views/PrivacyView.vue'
 import TermsView from './views/TermsView.vue'
 import UseCasesView from './views/UseCasesView.vue'
 import UseCaseView from './views/UseCaseView.vue'
+import AgentScratchpadHubView from './views/AgentScratchpadHubView.vue'
+import AgentScratchpadView from './views/AgentScratchpadView.vue'
 import ConnectView from './views/ConnectView.vue'
 import { auth, currentUser, initAuth, isAdmin } from './auth.js'
 import { applySeo } from './seo.js'
@@ -35,6 +37,14 @@ const routes = [
     path: '/use-cases/:slug(developers|business|family|news-apps-games)',
     name: 'use-case',
     component: UseCaseView,
+    props: true,
+    meta: { accounts: true },
+  },
+  { path: '/agent-scratchpad', name: 'agent-scratchpad', component: AgentScratchpadHubView, meta: marketing('Agent scratchpad') },
+  {
+    path: '/agent-scratchpad/:slug(share-context-across-platforms|backup-ai-chats)',
+    name: 'agent-scratchpad-page',
+    component: AgentScratchpadView,
     props: true,
     meta: { accounts: true },
   },
