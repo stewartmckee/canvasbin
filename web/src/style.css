@@ -1301,6 +1301,19 @@ code {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.plans.plans-4 {
+  grid-template-columns: repeat(4, minmax(0, 280px));
+}
+@media (max-width: 1200px) {
+  .plans.plans-4 {
+    grid-template-columns: repeat(2, minmax(0, 340px));
+  }
+}
+@media (max-width: 760px) {
+  .plans.plans-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
 /* Teams */
 .team-section-head {

@@ -8,7 +8,7 @@ import { track } from '../analytics.js'
 const route = useRoute()
 const router = useRouter()
 const next = safeNext(route.query.next)
-const plan = ['pro', 'team'].includes(route.query.plan) ? route.query.plan : ''
+const plan = ['pro', 'signal', 'team'].includes(route.query.plan) ? route.query.plan : ''
 const loginQuery = { ...(next !== '/' && { next }), ...(plan && { plan }) }
 const loginLink = { path: '/login', query: loginQuery }
 
@@ -49,8 +49,18 @@ async function submit() {
 
 <template>
   <div class="panel auth-card">
-    <h1>{{ plan === 'pro' ? 'Start with Individual' : plan === 'team' ? 'Start a team' : 'Create an account' }}</h1>
-    <p v-if="plan === 'pro'" class="notice">Create your account, then you'll go straight to secure checkout.</p>
+    <h1>
+      {{
+        plan === 'pro'
+          ? 'Start with Individual'
+          : plan === 'signal'
+            ? 'Start with Signal'
+            : plan === 'team'
+              ? 'Start a team'
+              : 'Create an account'
+      }}
+    </h1>
+    <p v-if="plan === 'pro' || plan === 'signal'" class="notice">Create your account, then you'll go straight to secure checkout.</p>
     <p v-else-if="plan === 'team'" class="notice">
       Create your account, then name your team. You'll verify your email before checkout.
     </p>
@@ -69,7 +79,7 @@ async function submit() {
         Password
         <input v-model="password" type="password" autocomplete="new-password" minlength="8" required />
       </label>
-      <button class="btn primary" type="submit" :disabled="busy">{{ busy ? 'Creating…' : plan === 'pro' ? 'Continue to payment' : plan === 'team' ? 'Continue' : 'Create account' }}</button>
+      <button class="btn primary" type="submit" :disabled="busy">{{ busy ? 'Creating…' : plan === 'pro' || plan === 'signal' ? 'Continue to payment' : plan === 'team' ? 'Continue' : 'Create account' }}</button>
     </form>
     <p class="muted small">Already have an account? <RouterLink :to="loginLink">Sign in</RouterLink></p>
   </div>

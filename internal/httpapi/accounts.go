@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -397,6 +398,7 @@ type meResponse struct {
 	Quota                int         `json:"quota"`
 	PageCount            int         `json:"page_count"`
 	BillingEnabled       bool        `json:"billing_enabled"`
+	SignalBillingEnabled bool        `json:"signal_billing_enabled"`
 	TeamBillingEnabled   bool        `json:"team_billing_enabled"`
 	StripePublishableKey string      `json:"stripe_publishable_key,omitempty"`
 	Teams                []teamView  `json:"teams"`
@@ -413,10 +415,7 @@ func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, status int, u *
 		writeStoreError(w, err)
 		return
 	}
-	plan := "free"
-	if config.IsPro(u) {
-		plan = "pro"
-	}
+	plan := s.Config.Plan(u)
 	writeJSON(w, status, meResponse{
 		User:                 u,
 		IsAdmin:              s.Config.IsAdmin(u.Email) && u.Verified(),
@@ -424,6 +423,7 @@ func (s *Server) writeMe(w http.ResponseWriter, r *http.Request, status int, u *
 		Quota:                s.Config.Quota(u),
 		PageCount:            n,
 		BillingEnabled:       s.Billing != nil && s.Billing.Enabled(),
+		SignalBillingEnabled: s.Billing != nil && s.Billing.SignalEnabled(),
 		TeamBillingEnabled:   s.Billing != nil && s.Billing.TeamEnabled(),
 		StripePublishableKey: s.Config.StripePublishableKey,
 		Teams:                s.teamViews(teams),
@@ -695,17 +695,40 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "billing is not available")
 		return
 	}
+	var in checkoutInput
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	plan := in.Plan
+	if plan == "" {
+		plan = config.PlanPro
+	}
 	if config.IsPro(u) {
-		writeError(w, http.StatusConflict, "already subscribed; use the billing portal to manage your plan")
+		if s.Config.Plan(u) == plan {
+			writeError(w, http.StatusConflict, "already subscribed; use the billing portal to manage your plan")
+			return
+		}
+		// Switching between paid plans updates the existing subscription.
+		if err := s.Billing.ChangePlan(r.Context(), u, plan); err != nil {
+			writeBillingError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"changed": true, "plan": plan})
 		return
 	}
 	base := s.baseURL(r)
-	url, err := s.Billing.CreateCheckoutSession(r.Context(), u, base+"/?billing=success", base+"/?billing=cancelled")
+	url, err := s.Billing.CreateCheckoutSession(r.Context(), u, plan, base+"/?billing=success", base+"/?billing=cancelled")
 	if err != nil {
 		writeBillingError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"url": url})
+}
+
+type checkoutInput struct {
+	Plan string `json:"plan"`
 }
 
 func (s *Server) portal(w http.ResponseWriter, r *http.Request) {
@@ -729,6 +752,8 @@ func writeBillingError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, billing.ErrNotConfigured):
 		writeError(w, http.StatusServiceUnavailable, "billing is not available")
+	case errors.Is(err, billing.ErrUnknownPlan):
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, billing.ErrNoCustomer):
 		writeError(w, http.StatusConflict, err.Error())
 	default:

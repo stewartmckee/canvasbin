@@ -48,7 +48,7 @@ const showUpgrade = computed(() => {
   const me = auth.me
   if (!me || !me.quota) return false
   if (me.page_count >= me.quota) return true
-  return me.plan !== 'pro' && auth.billingEnabled && me.page_count >= me.quota - 2
+  return me.plan === 'free' && auth.billingEnabled && me.page_count >= me.quota - 2
 })
 
 async function loadLibrary() {

@@ -15,8 +15,10 @@ export async function render(path, config) {
     accounts: true,
     billingEnabled: true,
     teamBillingEnabled: true,
+    signalBillingEnabled: true,
     freeQuota: config.freeQuota,
     proQuota: config.proQuota,
+    signalQuota: config.signalQuota,
     teamQuota: config.teamQuota,
     me: null,
   })

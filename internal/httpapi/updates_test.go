@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/live"
@@ -56,7 +58,8 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 	}
 	t.Cleanup(st.Close)
 	m := &fakeMailer{links: map[string]string{}}
-	cfg := config.Config{Updates: true, UpdatesMode: config.UpdatesModeFeed, MailgunKey: "x", MailgunDomain: "t", MailFrom: "t <t@t>"}
+	cfg := config.Config{Updates: true, UpdatesMode: config.UpdatesModeFeed, MailgunKey: "x", MailgunDomain: "t", MailFrom: "t <t@t>",
+		StripePricePro: "price_pro", StripePriceSignal: "price_signal"}
 	s := &Server{
 		Store: st, Config: cfg, Mailer: m,
 		Web:  fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
@@ -64,13 +67,50 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 	}
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
+	ctx := context.Background()
 
-	a, err := st.Create(context.Background(), "Site", "html", "<p>x</p>", false)
+	owner := func(price string) int64 {
+		u, err := st.CreateUser(ctx, fmt.Sprintf("%s-%d@example.com", price, time.Now().UnixNano()), "hash", "Owner")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := st.UpdateSubscription(ctx, u.ID, store.Subscription{CustomerID: "cus_" + price + fmt.Sprint(u.ID), SubscriptionID: "sub_" + fmt.Sprint(u.ID), PriceID: price, Status: "active"}); err != nil {
+			t.Fatal(err)
+		}
+		return u.ID
+	}
+	enable := func(writeKey string) int {
+		b, _ := json.Marshal(map[string]bool{"updates_enabled": true})
+		req, _ := http.NewRequest(http.MethodPatch, srv.URL+"/api/pages/"+writeKey+"/updates-settings", bytes.NewReader(b))
+		req.Header.Set("Content-Type", "application/json")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode
+	}
+
+	pro, err := st.CreateOwned(ctx, owner("price_pro"), "Pro", "html", "<p>x</p>", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetUpdatesEnabled(context.Background(), a.ID, true); err != nil {
+	if code := enable(pro.WriteKey); code != http.StatusPaymentRequired {
+		t.Fatalf("individual owner enabling updates: status %d, want 402", code)
+	}
+	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>", false)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if code := enable(anon.WriteKey); code != http.StatusPaymentRequired {
+		t.Fatalf("anonymous page enabling updates: status %d, want 402", code)
+	}
+
+	a, err := st.CreateOwned(ctx, owner("price_signal"), "Site", "html", "<p>x</p>", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code := enable(a.WriteKey); code != http.StatusOK {
+		t.Fatalf("signal owner enabling updates: status %d", code)
 	}
 	body, _ := json.Marshal(map[string]string{"email": "fan@example.com"})
 	res, err := http.Post(srv.URL+"/api/pages/"+a.ReadKey+"/subscribe", "application/json", bytes.NewReader(body))

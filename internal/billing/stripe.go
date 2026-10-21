@@ -42,6 +42,29 @@ func New(cfg config.Config, st *store.Store) *Service {
 // Enabled reports whether Stripe is configured enough to start checkout.
 func (s *Service) Enabled() bool { return s.api != nil && s.cfg.StripePricePro != "" }
 
+// SignalEnabled reports whether the Signal plan can be sold.
+func (s *Service) SignalEnabled() bool { return s.api != nil && s.cfg.StripePriceSignal != "" }
+
+// ErrUnknownPlan is returned for a plan that can't be bought.
+var ErrUnknownPlan = errors.New("unknown plan")
+
+// priceFor returns the Stripe price for a personal plan.
+func (s *Service) priceFor(plan string) (string, error) {
+	switch plan {
+	case config.PlanPro, "":
+		if s.cfg.StripePricePro != "" {
+			return s.cfg.StripePricePro, nil
+		}
+	case config.PlanSignal:
+		if s.cfg.StripePriceSignal != "" {
+			return s.cfg.StripePriceSignal, nil
+		}
+	default:
+		return "", ErrUnknownPlan
+	}
+	return "", ErrNotConfigured
+}
+
 // EnsureCustomer returns the user's Stripe customer id, creating one if needed.
 func (s *Service) EnsureCustomer(ctx context.Context, u *store.User) (string, error) {
 	if s.api == nil {
@@ -71,10 +94,15 @@ func (s *Service) EnsureCustomer(ctx context.Context, u *store.User) (string, er
 	return c.ID, nil
 }
 
-// CreateCheckoutSession starts a subscription checkout for the Pro price.
-func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, successURL, cancelURL string) (string, error) {
-	if !s.Enabled() {
+// CreateCheckoutSession starts a subscription checkout for a personal plan
+// (pro or signal).
+func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, plan, successURL, cancelURL string) (string, error) {
+	if s.api == nil {
 		return "", ErrNotConfigured
+	}
+	price, err := s.priceFor(plan)
+	if err != nil {
+		return "", err
 	}
 	cust, err := s.EnsureCustomer(ctx, u)
 	if err != nil {
@@ -88,7 +116,7 @@ func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, succ
 		SuccessURL:        stripe.String(successURL),
 		CancelURL:         stripe.String(cancelURL),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
-			{Price: stripe.String(s.cfg.StripePricePro), Quantity: stripe.Int64(1)},
+			{Price: stripe.String(price), Quantity: stripe.Int64(1)},
 		},
 		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
 			Metadata: map[string]string{"canvasbin_user_id": uid},
@@ -101,6 +129,44 @@ func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, succ
 		return "", fmt.Errorf("create checkout session: %w", err)
 	}
 	return sess.URL, nil
+}
+
+// ChangePlan moves an existing personal subscription to another plan's price,
+// prorating the difference, and stores the result.
+func (s *Service) ChangePlan(ctx context.Context, u *store.User, plan string) error {
+	if s.api == nil {
+		return ErrNotConfigured
+	}
+	price, err := s.priceFor(plan)
+	if err != nil {
+		return err
+	}
+	if u.StripeSubscriptionID == nil || *u.StripeSubscriptionID == "" {
+		return ErrNoCustomer
+	}
+	sub, err := s.api.Subscriptions.Get(*u.StripeSubscriptionID, &stripe.SubscriptionParams{Params: stripe.Params{Context: ctx}})
+	if err != nil {
+		return fmt.Errorf("fetch subscription: %w", err)
+	}
+	if sub.Items == nil || len(sub.Items.Data) == 0 {
+		return fmt.Errorf("subscription %s has no items", sub.ID)
+	}
+	item := sub.Items.Data[0]
+	if item.Price != nil && item.Price.ID == price {
+		return nil
+	}
+	params := &stripe.SubscriptionParams{
+		Items: []*stripe.SubscriptionItemsParams{
+			{ID: stripe.String(item.ID), Price: stripe.String(price)},
+		},
+		ProrationBehavior: stripe.String("create_prorations"),
+	}
+	params.Context = ctx
+	updated, err := s.api.Subscriptions.Update(sub.ID, params)
+	if err != nil {
+		return fmt.Errorf("change plan: %w", err)
+	}
+	return s.store.UpdateSubscription(ctx, u.ID, SubscriptionFrom(updated))
 }
 
 // CreatePortalSession opens the Stripe customer portal for managing a subscription.

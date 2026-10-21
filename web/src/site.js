@@ -5,9 +5,12 @@ export const site = {
   operator: 'Active Information Design Limited',
   contactEmail: 'support@canvasbin.dev',
   proPrice: '£2.99',
+  signalPrice: '£4.99',
   proInterval: 'month',
   teamBasePrice: '£15',
   teamSeatPrice: '£4',
 }
 
-export const planName = (plan) => (plan === 'pro' ? 'Individual' : 'Free')
+const planNames = { pro: 'Individual', signal: 'Signal' }
+export const planName = (plan) => planNames[plan] || 'Free'
+export const isPaidPlan = (plan) => Boolean(planNames[plan])

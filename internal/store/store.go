@@ -44,6 +44,8 @@ var (
 	ErrDisabled      = errors.New("account disabled")
 	ErrConflict      = errors.New("conflict")
 	ErrInvalidToken  = errors.New("invalid or expired token")
+
+	ErrUpdatesNotInPlan = errors.New("page updates are not included in the owner's plan")
 )
 
 type Page struct {
@@ -74,10 +76,10 @@ type Access struct {
 
 // Changes holds optional fields for an update.
 type Changes struct {
-	Title        *string
-	Format       *string
-	Content      *string
-	AgenticOnly  *bool
+	Title       *string
+	Format      *string
+	Content     *string
+	AgenticOnly *bool
 }
 
 type Store struct {

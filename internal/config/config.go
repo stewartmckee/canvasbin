@@ -3,6 +3,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -11,9 +12,10 @@ import (
 )
 
 const (
-	FreeQuota = 5
-	ProQuota  = 100
-	TeamQuota = 1000
+	FreeQuota   = 5
+	ProQuota    = 100
+	SignalQuota = 100
+	TeamQuota   = 1000
 
 	DefaultMailgunDomain = "canvasbin.dev"
 	DefaultMailFrom      = "Canvasbin <noreply@canvasbin.dev>"
@@ -30,6 +32,7 @@ type Config struct {
 	StripeSecretKey      string
 	StripeWebhookSecret  string
 	StripePricePro       string
+	StripePriceSignal    string // Signal plan: Individual-style page limit plus page updates
 	StripePriceTeamBase  string // flat monthly team price
 	StripePriceTeamSeat  string // per-member monthly price
 	StripePublishableKey string
@@ -48,14 +51,22 @@ type Config struct {
 	UpdatesMode string // feed (default) or notify_on_page_edit
 	ProductName string
 
-	FreeQuota int
-	ProQuota  int
-	TeamQuota int
+	FreeQuota   int
+	ProQuota    int
+	SignalQuota int
+	TeamQuota   int
 }
 
+// Personal plans. Pro is shown to people as "Individual".
 const (
-	UpdatesModeFeed           = "feed"
-	UpdatesModeNotifyOnEdit   = "notify_on_page_edit"
+	PlanFree   = "free"
+	PlanPro    = "pro"
+	PlanSignal = "signal"
+)
+
+const (
+	UpdatesModeFeed         = "feed"
+	UpdatesModeNotifyOnEdit = "notify_on_page_edit"
 )
 
 // Load reads configuration from the process environment.
@@ -79,6 +90,7 @@ func fromGetenv(get func(string) string) Config {
 		StripeSecretKey:      strings.TrimSpace(get("STRIPE_SECRET_KEY")),
 		StripeWebhookSecret:  strings.TrimSpace(get("STRIPE_WEBHOOK_SECRET")),
 		StripePricePro:       strings.TrimSpace(get("STRIPE_PRICE_PRO")),
+		StripePriceSignal:    strings.TrimSpace(get("STRIPE_PRICE_SIGNAL")),
 		StripePriceTeamBase:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_BASE")),
 		StripePriceTeamSeat:  strings.TrimSpace(get("STRIPE_PRICE_TEAM_SEAT")),
 		StripePublishableKey: strings.TrimSpace(get("STRIPE_PUBLISHABLE_KEY")),
@@ -90,6 +102,7 @@ func fromGetenv(get func(string) string) Config {
 		ProductName:          strings.TrimSpace(get("PRODUCT_NAME")),
 		FreeQuota:            FreeQuota,
 		ProQuota:             ProQuota,
+		SignalQuota:          SignalQuota,
 		TeamQuota:            TeamQuota,
 	}
 	for _, e := range strings.Split(get("ADMIN_EMAILS"), ",") {
@@ -140,6 +153,11 @@ func (c Config) BillingEnabled() bool {
 	return c.StripeSecretKey != "" && c.StripePricePro != ""
 }
 
+// SignalBillingEnabled is true when the Signal plan can be sold.
+func (c Config) SignalBillingEnabled() bool {
+	return c.StripeSecretKey != "" && c.StripePriceSignal != ""
+}
+
 // TeamBillingEnabled is true when team subscriptions can be sold.
 func (c Config) TeamBillingEnabled() bool {
 	return c.StripeSecretKey != "" && c.StripePriceTeamBase != "" && c.StripePriceTeamSeat != ""
@@ -177,13 +195,55 @@ func IsPro(u *store.User) bool {
 	return false
 }
 
+// Plan is the user's personal plan: free, pro, or signal. Any paid
+// subscription that isn't on the Signal price counts as pro.
+func (c Config) Plan(u *store.User) string {
+	if !IsPro(u) {
+		return PlanFree
+	}
+	if c.StripePriceSignal != "" && u.StripePriceID != nil && *u.StripePriceID == c.StripePriceSignal {
+		return PlanSignal
+	}
+	return PlanPro
+}
+
+// HasUpdates reports whether u's pages may use public updates and email
+// subscribers, which come with the Signal plan.
+func (c Config) HasUpdates(u *store.User) bool {
+	return c.Updates && c.Plan(u) == PlanSignal
+}
+
+// PageHasUpdates reports whether p may use updates: it must be a personal page
+// whose owner is on the Signal plan. Team and anonymous pages never qualify.
+func (c Config) PageHasUpdates(ctx context.Context, st *store.Store, p store.Page) bool {
+	if !c.Updates || p.TeamID != nil || p.OwnerID == nil {
+		return false
+	}
+	u, err := st.GetUserByID(ctx, *p.OwnerID)
+	if err != nil {
+		return false
+	}
+	return c.HasUpdates(u)
+}
+
 // Quota is the number of pages the user may own.
 func (c Config) Quota(u *store.User) int {
 	free, pro := c.PlanQuotas()
-	if IsPro(u) {
+	switch c.Plan(u) {
+	case PlanSignal:
+		return c.SignalPageQuota()
+	case PlanPro:
 		return pro
 	}
 	return free
+}
+
+// SignalPageQuota is the number of pages a Signal subscriber may own.
+func (c Config) SignalPageQuota() int {
+	if c.SignalQuota == 0 {
+		return SignalQuota
+	}
+	return c.SignalQuota
 }
 
 // PlanQuotas returns the free and Pro page limits, applying defaults.

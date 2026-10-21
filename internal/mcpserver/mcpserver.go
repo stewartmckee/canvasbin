@@ -292,6 +292,9 @@ func (t *tools) maybeNotifyPageEdit(ctx context.Context, a *store.Access, notify
 	if !t.Config.Updates || t.Config.UpdatesFeed() || !notify || t.Mailer == nil {
 		return
 	}
+	if !t.Config.PageHasUpdates(ctx, t.Store, a.Page) {
+		return
+	}
 	on, err := t.Store.UpdatesEnabled(ctx, a.ID)
 	if err != nil || !on {
 		return

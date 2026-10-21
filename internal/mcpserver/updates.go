@@ -18,13 +18,13 @@ func (t *tools) addUpdateTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "post_update",
 		Title:       "Post page update",
-		Description: "Publish an append-only update (title and Markdown body) on a page with updates enabled. Subscribers receive email when configured.",
+		Description: "Publish an append-only update (title and Markdown body) on a page with updates enabled. Subscribers receive email when configured. Updates need the page owner to be on the Signal plan.",
 		Annotations: writeTool(false, false, false),
 	}, t.postUpdate)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "set_updates_enabled",
 		Title:       "Enable page updates",
-		Description: "Turn public updates and email subscriptions on or off for a page. Requires the write key.",
+		Description: "Turn public updates and email subscriptions on or off for a page. Requires the write key, and turning updates on needs the page owner to be on the Signal plan.",
 		Annotations: writeTool(true, true, false),
 	}, t.setUpdatesEnabled)
 }
@@ -36,10 +36,10 @@ type PostUpdateInput struct {
 }
 
 type PostUpdateResult struct {
-	ID       int64  `json:"id"`
-	Title    string `json:"title"`
-	HTMLURL  string `json:"html_url"`
-	Queued   int    `json:"notifications_queued"`
+	ID      int64  `json:"id"`
+	Title   string `json:"title"`
+	HTMLURL string `json:"html_url"`
+	Queued  int    `json:"notifications_queued"`
 }
 
 func (t *tools) postUpdate(ctx context.Context, _ *mcp.CallToolRequest, in PostUpdateInput) (*mcp.CallToolResult, PostUpdateResult, error) {
@@ -53,6 +53,9 @@ func (t *tools) postUpdate(ctx context.Context, _ *mcp.CallToolRequest, in PostU
 	a, err := t.pageWrite(ctx, key)
 	if err != nil {
 		return nil, PostUpdateResult{}, err
+	}
+	if !t.Config.PageHasUpdates(ctx, t.Store, a.Page) {
+		return nil, PostUpdateResult{}, t.Config.UpdatesPlanError(t.base)
 	}
 	var uid *int64
 	if t.user != nil {
@@ -92,6 +95,9 @@ func (t *tools) setUpdatesEnabled(ctx context.Context, _ *mcp.CallToolRequest, i
 	a, err := t.pageWrite(ctx, key)
 	if err != nil {
 		return nil, SetUpdatesEnabledResult{}, err
+	}
+	if in.Enabled && !t.Config.PageHasUpdates(ctx, t.Store, a.Page) {
+		return nil, SetUpdatesEnabledResult{}, t.Config.UpdatesPlanError(t.base)
 	}
 	if err := t.Store.SetUpdatesEnabled(ctx, a.ID, in.Enabled); err != nil {
 		return nil, SetUpdatesEnabledResult{}, err

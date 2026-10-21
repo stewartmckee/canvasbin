@@ -6,7 +6,7 @@ import { auth, continueAfterSignIn, safeNext } from '../auth.js'
 
 const route = useRoute()
 const router = useRouter()
-const plan = ['pro', 'team'].includes(route.query.plan) ? route.query.plan : ''
+const plan = ['pro', 'signal', 'team'].includes(route.query.plan) ? route.query.plan : ''
 const email = ref('')
 const password = ref('')
 const busy = ref(false)
@@ -44,6 +44,7 @@ async function submit() {
   <div class="panel auth-card">
     <h1>Sign in</h1>
     <p v-if="plan === 'pro'" class="notice">Sign in to continue to Individual checkout.</p>
+    <p v-else-if="plan === 'signal'" class="notice">Sign in to continue to Signal checkout.</p>
     <p v-else-if="plan === 'team'" class="notice">Sign in to set up your team.</p>
     <p v-if="route.query.reset" class="notice">Password updated. Sign in with your new password.</p>
     <p v-if="error" class="notice error">{{ error }}</p>

@@ -5,6 +5,7 @@ export function pricingFaqs(freeQuota) {
   return [
     ['What counts as a page?', 'Each page you own counts once, however many times you edit it. Pages shared with you, and team pages, don’t count toward your personal limit.'],
     ['How does team billing work?', `${site.teamBasePrice} a ${site.proInterval} for the team plus ${site.teamSeatPrice} for each member, including you. Adding or removing someone is prorated automatically.`],
+    ['What does Signal add?', `Signal is ${site.signalPrice} a ${site.proInterval}. You can post updates on your pages, and readers can subscribe by email to get each one. It has the same page limit as Individual and no badge.`],
     ['What’s the difference between Individual and Team?', 'Individual is for one person: more pages, shared by link. Team adds a shared space where everyone edits the same pages, comments, a timeline of who changed what, a style guide assistants follow when they write team pages, and sharing with people by email.'],
     ['Is there Canvasbin branding on my pages?', 'Pages on the Free plan show a small “Made with Canvasbin” badge in the corner. Individual and Team pages have no badge.'],
     ['Can I cancel any time?', 'Yes. Cancel from your account or team settings and the plan stays active until the end of the period you’ve paid for.'],
@@ -21,10 +22,15 @@ export function pricingFaqs(freeQuota) {
 const amount = (price) => price.replace(/[^0-9.]/g, '')
 
 // Offers for the SoftwareApplication structured data.
-export function offers({ freeQuota, proQuota, teamQuota }) {
+export function offers({ freeQuota, proQuota, signalQuota = proQuota, teamQuota }) {
   return [
     { name: 'Free', price: '0', description: `Up to ${freeQuota} pages` },
     { name: 'Individual', price: amount(site.proPrice), description: `Up to ${proQuota} pages, no Canvasbin badge` },
+    {
+      name: 'Signal',
+      price: amount(site.signalPrice),
+      description: `Up to ${signalQuota} pages, page updates with email subscribers, no Canvasbin badge`,
+    },
     {
       name: 'Team',
       price: amount(site.teamBasePrice),

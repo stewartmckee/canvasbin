@@ -15,6 +15,20 @@ import (
 
 func (s *Server) updatesOn() bool { return s.Config.Updates }
 
+// pageUpdatesAllowed reports whether the page's owner is on a plan with updates.
+func (s *Server) pageUpdatesAllowed(ctx context.Context, a *store.Access) bool {
+	return s.Config.PageHasUpdates(ctx, s.Store, a.Page)
+}
+
+// pageUpdatesLive reports whether the page shows updates and takes subscribers.
+func (s *Server) pageUpdatesLive(ctx context.Context, a *store.Access) bool {
+	if !s.pageUpdatesAllowed(ctx, a) {
+		return false
+	}
+	on, err := s.Store.UpdatesEnabled(ctx, a.ID)
+	return err == nil && on
+}
+
 func (s *Server) registerUpdateRoutes(mux *http.ServeMux) {
 	if !s.updatesOn() {
 		return
@@ -62,8 +76,7 @@ func (s *Server) listPageUpdates(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	on, err := s.Store.UpdatesEnabled(r.Context(), a.ID)
-	if err != nil || !on {
+	if !s.pageUpdatesLive(r.Context(), a) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
@@ -95,6 +108,10 @@ func (s *Server) subscribePage(w http.ResponseWriter, r *http.Request) {
 	a, err := s.lookupPageByKey(r.Context(), r, key, false)
 	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	if !s.pageUpdatesLive(r.Context(), a) {
+		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 	var in subscribeInput
@@ -183,6 +200,10 @@ func (s *Server) createPageUpdate(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
+	if !s.pageUpdatesAllowed(r.Context(), a) {
+		writeStoreError(w, s.Config.UpdatesPlanError(s.baseURL(r)))
+		return
+	}
 	var in postUpdateInput
 	if !decode(w, r, &in) {
 		return
@@ -221,6 +242,10 @@ func (s *Server) patchUpdatesSettings(w http.ResponseWriter, r *http.Request) {
 	var in updatesSettingsInput
 	if !decode(w, r, &in) || in.Enabled == nil {
 		writeError(w, http.StatusBadRequest, "updates_enabled is required")
+		return
+	}
+	if *in.Enabled && !s.pageUpdatesAllowed(r.Context(), a) {
+		writeStoreError(w, s.Config.UpdatesPlanError(s.baseURL(r)))
 		return
 	}
 	if err := s.Store.SetUpdatesEnabled(r.Context(), a.ID, *in.Enabled); err != nil {
@@ -303,11 +328,7 @@ func excerpt(body string, max int) string {
 
 // injectUpdates adds feed HTML to a rendered page when enabled.
 func (s *Server) injectUpdates(ctx context.Context, doc string, a *store.Access) string {
-	if !s.updatesOn() {
-		return doc
-	}
-	on, err := s.Store.UpdatesEnabled(ctx, a.ID)
-	if err != nil || !on {
+	if !s.updatesOn() || !s.pageUpdatesLive(ctx, a) {
 		return doc
 	}
 	list, err := s.Store.ListPageUpdates(ctx, a.ID, 50)
@@ -327,8 +348,7 @@ func (s *Server) NotifyPageEditSubscribers(ctx context.Context, a *store.Access,
 	if !s.updatesOn() || !notify || s.Config.UpdatesFeed() {
 		return
 	}
-	on, err := s.Store.UpdatesEnabled(ctx, a.ID)
-	if err != nil || !on {
+	if !s.pageUpdatesLive(ctx, a) {
 		return
 	}
 	title := a.Title

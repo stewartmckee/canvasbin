@@ -2,29 +2,36 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { startCheckout } from '../api.js'
-import { auth, currentUser, myTeams } from '../auth.js'
-import { site } from '../site.js'
+import { auth, currentUser, loadMe, myTeams } from '../auth.js'
+import { isPaidPlan, site } from '../site.js'
 import { track } from '../analytics.js'
 
-const isPro = computed(() => auth.me?.plan === 'pro')
-const busy = ref(false)
+const plan = computed(() => auth.me?.plan || 'free')
+const isPaid = computed(() => isPaidPlan(plan.value))
+const busy = ref('')
 const error = ref('')
+const errorPlan = ref('')
 
-async function upgrade() {
-  busy.value = true
+async function choose(next) {
+  busy.value = next
   error.value = ''
+  errorPlan.value = next
   try {
-    const { url } = await startCheckout()
-    window.location.href = url
+    const res = await startCheckout(next)
+    if (res.url) {
+      window.location.href = res.url
+      return
+    }
+    await loadMe()
   } catch (e) {
     error.value = e.message
-    busy.value = false
   }
+  busy.value = ''
 }
 </script>
 
 <template>
-  <div class="plans plans-3">
+  <div class="plans plans-4">
     <article class="plan">
       <h3>Free</h3>
       <p class="price">£0</p>
@@ -39,7 +46,7 @@ async function upgrade() {
       <RouterLink v-if="!currentUser" to="/register" class="btn" @click="track('plan-click', { plan: 'free' })">
         Get started
       </RouterLink>
-      <span v-else-if="!isPro" class="btn ghost" aria-disabled="true">Your current plan</span>
+      <span v-else-if="!isPaid" class="btn ghost" aria-disabled="true">Your current plan</span>
     </article>
     <article class="plan featured">
       <h3>Individual</h3>
@@ -61,11 +68,50 @@ async function upgrade() {
       >
         Start with Individual
       </RouterLink>
-      <RouterLink v-else-if="isPro" to="/account" class="btn">Manage billing</RouterLink>
-      <button v-else-if="auth.billingEnabled" type="button" class="btn primary" :disabled="busy" @click="upgrade">
-        {{ busy ? 'Opening checkout…' : 'Upgrade to Individual' }}
+      <RouterLink v-else-if="plan === 'pro'" to="/account" class="btn">Manage billing</RouterLink>
+      <button
+        v-else-if="auth.billingEnabled"
+        type="button"
+        class="btn primary"
+        :disabled="Boolean(busy)"
+        @click="choose('pro')"
+      >
+        {{ busy === 'pro' ? 'Opening checkout…' : isPaid ? 'Switch to Individual' : 'Upgrade to Individual' }}
       </button>
-      <p v-if="error" class="field-error">{{ error }}</p>
+      <p v-if="error && errorPlan === 'pro'" class="field-error">{{ error }}</p>
+    </article>
+    <article class="plan">
+      <h3>Signal</h3>
+      <p class="price">
+        {{ site.signalPrice }}<span class="per">/{{ site.proInterval }}</span>
+      </p>
+      <p class="muted">For pages people follow: post updates and readers get them by email.</p>
+      <ul>
+        <li>Up to {{ auth.signalQuota }} pages</li>
+        <li>Post updates on your pages</li>
+        <li>Readers subscribe by email and get every update</li>
+        <li>No Canvasbin badge</li>
+        <li>Cancel any time from your account</li>
+      </ul>
+      <RouterLink
+        v-if="!currentUser"
+        :to="{ path: '/register', query: { plan: 'signal' } }"
+        class="btn"
+        @click="track('plan-click', { plan: 'signal' })"
+      >
+        Start with Signal
+      </RouterLink>
+      <RouterLink v-else-if="plan === 'signal'" to="/account" class="btn">Manage billing</RouterLink>
+      <button
+        v-else-if="auth.signalBillingEnabled"
+        type="button"
+        class="btn"
+        :disabled="Boolean(busy)"
+        @click="choose('signal')"
+      >
+        {{ busy === 'signal' ? 'Opening checkout…' : isPaid ? 'Switch to Signal' : 'Upgrade to Signal' }}
+      </button>
+      <p v-if="error && errorPlan === 'signal'" class="field-error">{{ error }}</p>
     </article>
     <article class="plan">
       <h3>Team</h3>

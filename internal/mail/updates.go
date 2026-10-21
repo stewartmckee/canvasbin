@@ -51,11 +51,11 @@ func (c *Client) SendUpdateNotification(ctx context.Context, email, product, pag
 	}
 	text += "View update: " + viewURL + "\n\nUnsubscribe: " + unsubURL + "\n"
 	html, err := htmlEmail{
-		Preheader: summary,
-		Heading:   updateTitle,
-		Intro:     introLines(summary),
-		Button:    &emailButton{Label: "View update", URL: viewURL},
-		Footer:    fmt.Sprintf("You're receiving this email because you subscribed to updates for %s on %s.", page, product),
+		Preheader:  summary,
+		Heading:    updateTitle,
+		Intro:      introLines(summary),
+		Button:     &emailButton{Label: "View update", URL: viewURL},
+		Footer:     fmt.Sprintf("You're receiving this email because you subscribed to updates for %s on %s.", page, product),
 		FooterLink: &emailButton{Label: "Unsubscribe", URL: unsubURL},
 		Base:       viewBase(viewURL),
 	}.render()

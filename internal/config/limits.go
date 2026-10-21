@@ -8,8 +8,9 @@ import (
 
 // Prices as shown on the pricing page; keep in step with web/src/site.js.
 const (
-	ProPrice  = "£2.99/month"
-	TeamPrice = "£15/month plus £4 per member"
+	ProPrice    = "£2.99/month"
+	SignalPrice = "£4.99/month"
+	TeamPrice   = "£15/month plus £4 per member"
 )
 
 // The errors below wrap the store sentinels with what the user can do next.
@@ -19,12 +20,17 @@ const (
 func (c Config) QuotaError(u *store.User, base string) error {
 	free, pro := c.PlanQuotas()
 	if IsPro(u) {
-		if c.TeamBillingEnabled() {
-			return fmt.Errorf("%w: all %d pages on the Individual plan are in use. Delete a page that is no longer needed, or start a Team (%s, %d shared pages) at %s/pricing",
-				store.ErrQuotaExceeded, pro, TeamPrice, c.TeamPageQuota(), base)
+		name := "Individual"
+		if c.Plan(u) == PlanSignal {
+			name = "Signal"
 		}
-		return fmt.Errorf("%w: all %d pages on the Individual plan are in use. Delete a page that is no longer needed",
-			store.ErrQuotaExceeded, pro)
+		n := c.Quota(u)
+		if c.TeamBillingEnabled() {
+			return fmt.Errorf("%w: all %d pages on the %s plan are in use. Delete a page that is no longer needed, or start a Team (%s, %d shared pages) at %s/pricing",
+				store.ErrQuotaExceeded, n, name, TeamPrice, c.TeamPageQuota(), base)
+		}
+		return fmt.Errorf("%w: all %d pages on the %s plan are in use. Delete a page that is no longer needed",
+			store.ErrQuotaExceeded, n, name)
 	}
 	if c.BillingEnabled() {
 		return fmt.Errorf("%w: all %d pages on the Free plan are in use. Upgrade to Individual (%s for %d pages, no Canvasbin badge) at %s/pricing, or delete a page that is no longer needed",
@@ -55,4 +61,13 @@ func StyleGuideInactiveError(base string, teamID int64) error {
 func UnverifiedError(base string) error {
 	return fmt.Errorf("%w: click the link in the verification email from Canvasbin, or resend it from %s/account, then try again",
 		store.ErrUnverified, base)
+}
+
+// UpdatesPlanError explains that page updates come with the Signal plan.
+func (c Config) UpdatesPlanError(base string) error {
+	if c.SignalBillingEnabled() {
+		return fmt.Errorf("%w: page updates and email subscribers are part of the Signal plan (%s). The page owner can upgrade at %s/pricing",
+			store.ErrUpdatesNotInPlan, SignalPrice, base)
+	}
+	return fmt.Errorf("%w: page updates and email subscribers are part of the Signal plan", store.ErrUpdatesNotInPlan)
 }

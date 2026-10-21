@@ -1,7 +1,9 @@
 <script setup>
 import { ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { setUpdatesEnabled } from '../api.js'
 import { auth } from '../auth.js'
+import { site } from '../site.js'
 
 const props = defineProps({
   page: { type: Object, required: true },
@@ -38,7 +40,7 @@ async function toggle(ev) {
 </script>
 
 <template>
-  <section v-if="auth.updates && page.can_write" class="panel updates-panel">
+  <section v-if="auth.updates && page.can_write && page.updates_available" class="panel updates-panel">
     <h2>Email updates</h2>
     <p class="muted small">
       Let visitors subscribe on your rendered page. Post updates with
@@ -50,5 +52,13 @@ async function toggle(ev) {
       <span>Public updates and subscriptions</span>
     </label>
     <p v-if="enabled && count" class="muted small">{{ count }} active subscriber{{ count === 1 ? '' : 's' }}</p>
+  </section>
+  <section v-else-if="auth.updates && page.role === 'owner' && !page.team_id" class="panel updates-panel">
+    <h2>Email updates</h2>
+    <p class="muted small">
+      Post updates on this page and let readers subscribe by email with the Signal plan ({{ site.signalPrice }} a
+      {{ site.proInterval }}).
+    </p>
+    <RouterLink to="/pricing" class="btn small">See Signal</RouterLink>
   </section>
 </template>

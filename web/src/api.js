@@ -61,9 +61,11 @@ export const listConnections = () => request('GET', '/api/connections')
 export const revokeConnection = (clientId) => request('POST', '/api/connections/revoke', { client_id: clientId })
 
 // Billing
-export const startCheckout = () => {
-  track('checkout-start', { plan: 'individual' })
-  return request('POST', '/api/billing/checkout')
+// startCheckout returns { url } for Stripe Checkout, or { changed: true } when an
+// existing subscription was switched to the other plan.
+export const startCheckout = (plan = 'pro') => {
+  track('checkout-start', { plan: plan === 'pro' ? 'individual' : plan })
+  return request('POST', '/api/billing/checkout', { plan })
 }
 export const openBillingPortal = () => request('POST', '/api/billing/portal')
 

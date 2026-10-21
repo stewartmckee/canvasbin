@@ -7,8 +7,10 @@ export const auth = reactive({
   accounts: false,
   billingEnabled: false,
   teamBillingEnabled: false,
+  signalBillingEnabled: false,
   freeQuota: 5,
   proQuota: 100,
+  signalQuota: 100,
   teamQuota: 1000,
   updates: false,
   me: null,
@@ -45,8 +47,10 @@ export function initAuth() {
         auth.accounts = Boolean(cfg?.accounts)
         auth.billingEnabled = Boolean(cfg?.billing_enabled)
         auth.teamBillingEnabled = Boolean(cfg?.team_billing_enabled)
+        auth.signalBillingEnabled = Boolean(cfg?.signal_billing_enabled)
         if (cfg?.free_quota) auth.freeQuota = cfg.free_quota
         if (cfg?.pro_quota) auth.proQuota = cfg.pro_quota
+        if (cfg?.signal_quota) auth.signalQuota = cfg.signal_quota
         if (cfg?.team_quota) auth.teamQuota = cfg.team_quota
         auth.updates = Boolean(cfg?.updates)
       } catch {
@@ -69,16 +73,21 @@ export function safeNext(value) {
 }
 
 // continueAfterSignIn carries on with the plan the visitor picked before signing
-// in: Stripe Checkout for Individual, team setup for Team. It returns false when
+// in: Stripe Checkout for Individual or Signal, team setup for Team. It returns false when
 // there's nothing to continue so the caller navigates as usual.
 export async function continueAfterSignIn(plan, router) {
   if (plan === 'team' && router) {
     await router.replace({ name: 'team-new' })
     return true
   }
-  if (plan !== 'pro' || !auth.billingEnabled || auth.me?.plan === 'pro') return false
-  const { url } = await startCheckout()
-  window.location.assign(url)
+  const enabled = plan === 'pro' ? auth.billingEnabled : plan === 'signal' ? auth.signalBillingEnabled : false
+  if (!enabled || auth.me?.plan === plan) return false
+  const res = await startCheckout(plan)
+  if (res.url) {
+    window.location.assign(res.url)
+  } else {
+    await loadMe()
+  }
   return true
 }
 

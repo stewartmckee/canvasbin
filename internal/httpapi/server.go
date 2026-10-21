@@ -206,6 +206,8 @@ type pageResponse struct {
 	links.Links
 	UpdatesEnabled  bool `json:"updates_enabled,omitempty"`
 	SubscriberCount int  `json:"subscriber_count,omitempty"`
+	// UpdatesAvailable tells editors whether the owner's plan includes updates.
+	UpdatesAvailable bool `json:"updates_available,omitempty"`
 }
 
 func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
@@ -221,7 +223,8 @@ func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
 	if a.TeamRole != "" {
 		out.TeamID, out.TeamName, out.TeamRole = a.TeamID, a.TeamName, a.TeamRole
 	}
-	if s.updatesOn() {
+	if s.updatesOn() && s.pageUpdatesAllowed(r.Context(), a) {
+		out.UpdatesAvailable = a.CanWrite
 		on, err := s.Store.UpdatesEnabled(r.Context(), a.ID)
 		if err == nil {
 			out.UpdatesEnabled = on
@@ -255,6 +258,8 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 		cfg["free_quota"], cfg["pro_quota"] = s.Config.PlanQuotas()
 		cfg["team_quota"] = s.Config.TeamPageQuota()
 		cfg["team_billing_enabled"] = s.Billing != nil && s.Billing.TeamEnabled()
+		cfg["signal_billing_enabled"] = s.Billing != nil && s.Billing.SignalEnabled()
+		cfg["signal_quota"] = s.Config.SignalPageQuota()
 	}
 	writeJSON(w, http.StatusOK, cfg)
 }
@@ -692,6 +697,8 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, store.ErrTeamInactive):
 		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": err.Error(), "code": "team_inactive"})
+	case errors.Is(err, store.ErrUpdatesNotInPlan):
+		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": err.Error(), "code": "updates_plan"})
 	case errors.Is(err, store.ErrTeamOwner):
 		writeError(w, http.StatusConflict, err.Error())
 	default:

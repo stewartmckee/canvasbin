@@ -155,6 +155,7 @@ func (s *Store) SubscribePage(ctx context.Context, pageID int64, email string) (
 	if err == nil && status == SubscriberActive {
 		return "", ErrAlreadySubscribed
 	}
+	isNew := errors.Is(err, pgx.ErrNoRows)
 	confirmToken, err = keys.NewWrite()
 	if err != nil {
 		return "", err
@@ -163,7 +164,7 @@ func (s *Store) SubscribePage(ctx context.Context, pageID int64, email string) (
 	if err != nil {
 		return "", err
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if isNew {
 		_, err = s.db.Exec(ctx,
 			`INSERT INTO page_update_subscribers (page_id, email, status, confirm_token, unsubscribe_token)
 			 VALUES ($1, $2, $3, $4, $5)`,
@@ -248,13 +249,13 @@ func (s *Store) EnqueueUpdateNotifications(ctx context.Context, updateID int64, 
 
 // OutboxItem is a pending notification email.
 type OutboxItem struct {
-	ID              int64
-	UpdateID        int64
-	Email           string
-	PageTitle       string
-	ReadKey         string
-	UpdateTitle     string
-	UpdateBody      string
+	ID               int64
+	UpdateID         int64
+	Email            string
+	PageTitle        string
+	ReadKey          string
+	UpdateTitle      string
+	UpdateBody       string
 	UnsubscribeToken string
 }
 

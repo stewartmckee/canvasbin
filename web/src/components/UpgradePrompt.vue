@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 import { startCheckout } from '../api.js'
 import { auth } from '../auth.js'
 import { track } from '../analytics.js'
-import { site } from '../site.js'
+import { isPaidPlan, planName, site } from '../site.js'
 
 // Shown as Free users near their page limit and whenever a create or claim
 // hits it. `from` labels the analytics event.
@@ -15,7 +15,7 @@ const props = defineProps({
 const used = computed(() => auth.me?.page_count ?? 0)
 const quota = computed(() => auth.me?.quota ?? auth.freeQuota)
 const full = computed(() => used.value >= quota.value)
-const pro = computed(() => auth.me?.plan === 'pro')
+const pro = computed(() => isPaidPlan(auth.me?.plan))
 const offer = computed(() => {
   if (!pro.value && auth.billingEnabled) return 'individual'
   if (pro.value && auth.teamBillingEnabled) return 'team'
@@ -30,7 +30,7 @@ async function upgrade() {
   busy.value = true
   error.value = ''
   try {
-    const { url } = await startCheckout()
+    const { url } = await startCheckout('pro')
     window.location.assign(url)
   } catch (e) {
     error.value = e.message
@@ -42,7 +42,7 @@ async function upgrade() {
 <template>
   <div class="notice upsell" role="status">
     <p>
-      <strong v-if="full">You've used all {{ quota }} pages on the {{ pro ? 'Individual' : 'Free' }} plan.</strong>
+      <strong v-if="full">You've used all {{ quota }} pages on the {{ planName(auth.me?.plan) }} plan.</strong>
       <strong v-else>You've used {{ used }} of your {{ quota }} free pages.</strong>
       <template v-if="offer === 'individual'">
         Individual gives you {{ auth.proQuota }} pages with no Canvasbin badge, for {{ site.proPrice }} a

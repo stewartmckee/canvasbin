@@ -59,3 +59,38 @@ func TestQuota(t *testing.T) {
 		}
 	}
 }
+
+func TestSignalPlan(t *testing.T) {
+	c := fromGetenv(env(map[string]string{"UPDATES": "on", "STRIPE_PRICE_PRO": "price_pro", "STRIPE_PRICE_SIGNAL": "price_signal"}))
+	str := func(s string) *string { return &s }
+	cases := []struct {
+		status  string
+		price   *string
+		plan    string
+		updates bool
+	}{
+		{"", nil, PlanFree, false},
+		{"canceled", str("price_signal"), PlanFree, false},
+		{"active", str("price_pro"), PlanPro, false},
+		{"active", nil, PlanPro, false},
+		{"active", str("price_signal"), PlanSignal, true},
+		{"past_due", str("price_signal"), PlanSignal, true},
+	}
+	for _, tc := range cases {
+		u := &store.User{SubscriptionStatus: tc.status, StripePriceID: tc.price}
+		if got := c.Plan(u); got != tc.plan {
+			t.Errorf("%s/%v: plan %q, want %q", tc.status, tc.price, got, tc.plan)
+		}
+		if got := c.HasUpdates(u); got != tc.updates {
+			t.Errorf("%s/%v: updates %v, want %v", tc.status, tc.price, got, tc.updates)
+		}
+	}
+	signal := &store.User{SubscriptionStatus: "active", StripePriceID: str("price_signal")}
+	if got := c.Quota(signal); got != SignalQuota {
+		t.Errorf("signal quota %d, want %d", got, SignalQuota)
+	}
+	c.Updates = false
+	if c.HasUpdates(signal) {
+		t.Error("UPDATES=off should disable updates even on Signal")
+	}
+}

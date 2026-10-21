@@ -3,8 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import McpConnect from '../components/McpConnect.vue'
 import { listConnections, openBillingPortal, revokeConnection, startCheckout } from '../api.js'
-import { auth, currentUser, isAdmin, logout, myTeams } from '../auth.js'
+import { auth, currentUser, isAdmin, loadMe, logout, myTeams } from '../auth.js'
 import { track } from '../analytics.js'
+import { isPaidPlan, planName } from '../site.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,7 +14,8 @@ const busy = ref(false)
 const error = ref('')
 
 const me = computed(() => auth.me)
-const isPro = computed(() => me.value?.plan === 'pro')
+const plan = computed(() => me.value?.plan || 'free')
+const isPaid = computed(() => isPaidPlan(plan.value))
 const quotaText = computed(() => {
   const m = me.value
   if (!m) return ''
@@ -28,8 +30,13 @@ async function go(fn) {
   busy.value = true
   error.value = ''
   try {
-    const { url } = await fn()
-    window.location.href = url
+    const res = await fn()
+    if (res.url) {
+      window.location.href = res.url
+      return
+    }
+    await loadMe()
+    busy.value = false
   } catch (e) {
     error.value = e.message
     busy.value = false
@@ -101,7 +108,7 @@ onMounted(loadApps)
         <h2>Plan</h2>
         <dl class="facts">
           <dt>Current plan</dt>
-          <dd>{{ isPro ? 'Individual' : 'Free' }}</dd>
+          <dd>{{ planName(plan) }}</dd>
           <dt>Usage</dt>
           <dd>{{ quotaText }}</dd>
           <template v-if="currentUser.subscription_status && currentUser.subscription_status !== 'none'">
@@ -114,14 +121,32 @@ onMounted(loadApps)
             </dd>
           </template>
         </dl>
-        <template v-if="auth.billingEnabled">
-          <button v-if="!isPro" type="button" class="btn primary" :disabled="busy" @click="go(startCheckout)">
-            Upgrade to Individual
+        <div v-if="auth.billingEnabled" class="notice-actions">
+          <button
+            v-if="plan !== 'pro'"
+            type="button"
+            :class="isPaid ? 'btn' : 'btn primary'"
+            :disabled="busy"
+            @click="go(() => startCheckout('pro'))"
+          >
+            {{ isPaid ? 'Switch to Individual' : 'Upgrade to Individual' }}
           </button>
-          <button v-else type="button" class="btn" :disabled="busy" @click="go(openBillingPortal)">
+          <button
+            v-if="plan !== 'signal' && auth.signalBillingEnabled"
+            type="button"
+            class="btn"
+            :disabled="busy"
+            @click="go(() => startCheckout('signal'))"
+          >
+            {{ isPaid ? 'Switch to Signal' : 'Upgrade to Signal' }}
+          </button>
+          <button v-if="isPaid" type="button" class="btn" :disabled="busy" @click="go(openBillingPortal)">
             Manage billing
           </button>
-        </template>
+        </div>
+        <p v-if="auth.billingEnabled && auth.signalBillingEnabled && plan !== 'signal'" class="muted small">
+          Signal adds page updates that readers can subscribe to by email.
+        </p>
         <p v-else class="muted small">Billing is not enabled on this server.</p>
       </section>
     </div>

@@ -11,7 +11,7 @@ const ssrDir = join(root, 'dist-ssr')
 
 // Keep in step with the production config (/api/config); the app re-renders
 // with live values once it loads.
-const config = { freeQuota: 5, proQuota: 100, teamQuota: 1000 }
+const config = { freeQuota: 5, proQuota: 100, signalQuota: 100, teamQuota: 1000 }
 
 const { render, marketingPaths } = await import(pathToFileURL(join(ssrDir, 'entry-server.js')).href)
 const template = await readFile(join(dist, 'index.html'), 'utf8')
