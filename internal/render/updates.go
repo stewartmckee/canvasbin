@@ -105,7 +105,7 @@ func updatesScript(readKey string) string {
 		`if(h.parentElement!==document.body||getComputedStyle(document.body).maxWidth!=="none")h.setAttribute("data-fit","");` +
 		`function go(){var m=location.hash.match(/^#update-(\d+)$/);if(!m)return;var e=r.getElementById("update-"+m[1]);if(!e)return;var d=e.closest("details");if(d)d.open=true;e.scrollIntoView({block:"start"})}go();window.addEventListener("hashchange",go);` +
 		`var f=r.querySelector("form"),i=r.querySelector("input"),b=r.querySelector("button"),g=r.querySelector(".msg");f.addEventListener("submit",function(e){e.preventDefault();b.disabled=true;` +
-		`fetch("/api/pages/"+encodeURIComponent("` + key + `")+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:i.value})}).then(function(x){return x.json().then(function(j){return{ok:x.ok,body:j}})})` +
+		`fetch("/api/pages/"+encodeURIComponent("` + key + `")+"/subscribe",{method:"POST",credentials:"omit",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:i.value})}).then(function(x){return x.json().then(function(j){return{ok:x.ok,body:j}})})` +
 		`.then(function(x){g.hidden=false;g.textContent=x.ok?(x.body.message||"Check your email to confirm."):((x.body&&x.body.error)||"Could not subscribe.");if(x.ok)i.value=""})` +
 		`.catch(function(){g.hidden=false;g.textContent="Could not subscribe."}).then(function(){b.disabled=false})})})();</script>`
 }

@@ -112,9 +112,17 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 	if code := enable(a.WriteKey); code != http.StatusOK {
 		t.Fatalf("signal owner enabling updates: status %d", code)
 	}
+	pre, _ := http.NewRequest(http.MethodOptions, srv.URL+"/api/pages/"+a.ReadKey+"/subscribe", nil)
+	pre.Header.Set("Origin", "null")
+	pre.Header.Set("Access-Control-Request-Method", "POST")
+	pre.Header.Set("Access-Control-Request-Headers", "content-type")
+	pres, err := http.DefaultClient.Do(pre)
+	if err != nil || pres.StatusCode != http.StatusNoContent || pres.Header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("subscribe preflight from a sandboxed page should be allowed: %v %v", pres, err)
+	}
 	body, _ := json.Marshal(map[string]string{"email": "fan@example.com"})
 	res, err := http.Post(srv.URL+"/api/pages/"+a.ReadKey+"/subscribe", "application/json", bytes.NewReader(body))
-	if err != nil || res.StatusCode != 200 {
+	if err != nil || res.StatusCode != 200 || res.Header.Get("Access-Control-Allow-Origin") != "*" {
 		t.Fatalf("subscribe %d %v", res.StatusCode, err)
 	}
 	link := m.get("subconfirm", "fan@example.com")

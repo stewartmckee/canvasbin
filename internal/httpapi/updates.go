@@ -35,6 +35,7 @@ func (s *Server) registerUpdateRoutes(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/pages/{key}/updates", s.listPageUpdates)
 	mux.HandleFunc("POST /api/pages/{key}/subscribe", s.subscribePage)
+	mux.HandleFunc("OPTIONS /api/pages/{key}/subscribe", s.subscribePreflight)
 	mux.HandleFunc("POST /api/pages/{key}/updates", s.createPageUpdate)
 	mux.HandleFunc("PATCH /api/pages/{key}/updates-settings", s.patchUpdatesSettings)
 	mux.HandleFunc("GET /api/subscribe/confirm", s.confirmSubscribe)
@@ -92,7 +93,24 @@ type subscribeInput struct {
 	Email string `json:"email"`
 }
 
+// allowSandboxCaller lets rendered pages call an endpoint. They run in an
+// opaque-origin sandbox and send Origin: null, so any origin is allowed; this
+// is only for endpoints that use no cookies or session.
+func allowSandboxCaller(w http.ResponseWriter) {
+	h := w.Header()
+	h.Set("Access-Control-Allow-Origin", "*")
+	h.Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	h.Set("Access-Control-Allow-Headers", "Content-Type")
+	h.Set("Access-Control-Max-Age", "86400")
+}
+
+func (s *Server) subscribePreflight(w http.ResponseWriter, r *http.Request) {
+	allowSandboxCaller(w)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) subscribePage(w http.ResponseWriter, r *http.Request) {
+	allowSandboxCaller(w)
 	if !s.updatesOn() {
 		writeError(w, http.StatusNotFound, "not found")
 		return
