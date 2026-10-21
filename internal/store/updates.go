@@ -49,7 +49,9 @@ func scanUpdate(row pgx.Row, u *PageUpdate) error {
 
 // SetUpdatesEnabled toggles public updates for a page.
 func (s *Store) SetUpdatesEnabled(ctx context.Context, pageID int64, on bool) error {
-	tag, err := s.db.Exec(ctx, `UPDATE pages SET updates_enabled = $2, updated_at = now() WHERE id = $1`, pageID, on)
+	tag, err := s.db.Exec(ctx,
+		`WITH p AS (UPDATE pages SET updates_enabled = $2, updated_at = now() WHERE id = $1 RETURNING id, updated_at)
+		 SELECT `+notifyPageSQL+` FROM p`, pageID, on)
 	if err != nil {
 		return err
 	}
@@ -126,7 +128,9 @@ func (s *Store) CreatePageUpdate(ctx context.Context, pageID int64, userID *int6
 		return nil, err
 	}
 	if !scheduled {
-		_, _ = s.db.Exec(ctx, `UPDATE pages SET updated_at = now() WHERE id = $1`, pageID)
+		_, _ = s.db.Exec(ctx,
+			`WITH p AS (UPDATE pages SET updated_at = now() WHERE id = $1 RETURNING id, updated_at)
+			 SELECT `+notifyPageSQL+` FROM p`, pageID)
 	}
 	return &u, nil
 }
@@ -206,7 +210,7 @@ func (s *Store) ClaimDueUpdates(ctx context.Context, limit int) ([]DueUpdate, er
 		 ), bumped AS (
 		   UPDATE pages p SET updated_at = now()
 		   WHERE p.id IN (SELECT page_id FROM claimed)
-		   RETURNING p.id, COALESCE(p.read_key, '') AS read_key
+		   RETURNING p.id, COALESCE(p.read_key, '') AS read_key, `+notifyPageSQL+` AS notified
 		 )
 		 SELECT c.id, c.page_id, COALESCE(NULLIF(c.read_key, ''), b.read_key, '')
 		 FROM claimed c LEFT JOIN bumped b ON b.id = c.page_id`, limit)

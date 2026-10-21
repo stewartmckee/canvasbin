@@ -11,7 +11,8 @@ import (
 )
 
 // PageChange is sent by the pages_notify_change trigger when a page's title,
-// format or content changes, or the page is deleted.
+// format or content changes, or the page is deleted, and by the store when a
+// page's updates change.
 type PageChange struct {
 	ID        int64     `json:"id"`
 	Deleted   bool      `json:"deleted"`
@@ -65,6 +66,11 @@ func (s *Store) listen(ctx context.Context, fn func(PageChange), connected func(
 		fn(c)
 	}
 }
+
+// notifyPageSQL builds the page_changed payload for a pages row aliased p. The
+// trigger only fires for title, format and content changes, so anything else
+// that changes the rendered page (such as its updates) has to notify itself.
+const notifyPageSQL = `pg_notify('page_changed', json_build_object('id', p.id, 'updated_at', p.updated_at)::text)`
 
 // PageUpdatedAt returns when a page last changed, or ErrNotFound.
 func (s *Store) PageUpdatedAt(ctx context.Context, id int64) (time.Time, error) {
