@@ -9,6 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/stewartmckee/canvasbin/internal/config"
 	"github.com/stewartmckee/canvasbin/internal/keys"
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
@@ -22,14 +23,20 @@ Page updates are emailed to every subscriber when they are published, and a publ
 3. Post only once they approve the wording and the timing. If they ask for changes, show the revised draft again.
 Don't treat the original request to post an update as approval of your draft, because you may have added or changed details. A scheduled update stays hidden and unsent until its time; list_scheduled_updates shows what's waiting and cancel_scheduled_update removes one before it goes out.`
 
+// offersUpdates reports whether the caller gets the update tools: only signed-in
+// users whose plan includes updates, since nobody else could use them.
+func offersUpdates(c config.Config, u *store.User) bool {
+	return u != nil && c.HasUpdates(u)
+}
+
 func (t *tools) addUpdateTools(s *mcp.Server) {
-	if !t.Config.Updates {
+	if !offersUpdates(t.Config, t.user) {
 		return
 	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "post_update",
 		Title:       "Post page update",
-		Description: "Publish an append-only update (title and Markdown body) on a page with updates enabled, now or at a scheduled publish_at. Subscribers are emailed when it is published, and a published update can't be recalled. Before calling, show the user the exact title, body and page, ask whether to publish now or later, and call only after they approve the wording and timing. Updates need the page owner to be on the Signal plan.",
+		Description: "Publish an append-only update (title and Markdown body) on a page with updates enabled, now or at a scheduled publish_at. Subscribers are emailed when it is published, and a published update can't be recalled. Before calling, show the user the exact title, body and page, ask whether to publish now or later, and call only after they approve the wording and timing.",
 		Annotations: writeTool(false, false, false),
 	}, t.postUpdate)
 	mcp.AddTool(s, &mcp.Tool{
@@ -47,7 +54,7 @@ func (t *tools) addUpdateTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "set_updates_enabled",
 		Title:       "Enable page updates",
-		Description: "Turn public updates and email subscriptions on or off for a page. Requires the write key, and turning updates on needs the page owner to be on the Signal plan.",
+		Description: "Turn public updates and email subscriptions on or off for a page. Requires the write key. Only personal pages owned by an account whose plan includes updates can use them.",
 		Annotations: writeTool(true, true, false),
 	}, t.setUpdatesEnabled)
 }

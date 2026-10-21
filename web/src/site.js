@@ -6,6 +6,9 @@ export const site = {
   contactEmail: 'support@canvasbin.dev',
   proPrice: '£2.99',
   signalPrice: '£4.99',
+  // Signal isn't offered publicly yet; existing Signal accounts keep working.
+  // Keep in step with SignalListed in internal/config/limits.go.
+  showSignal: false,
   proInterval: 'month',
   teamBasePrice: '£15',
   teamSeatPrice: '£4',

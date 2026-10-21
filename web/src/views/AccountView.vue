@@ -5,7 +5,7 @@ import McpConnect from '../components/McpConnect.vue'
 import { listConnections, openBillingPortal, revokeConnection, startCheckout } from '../api.js'
 import { auth, currentUser, isAdmin, loadMe, logout, myTeams } from '../auth.js'
 import { track } from '../analytics.js'
-import { isPaidPlan, planName } from '../site.js'
+import { isPaidPlan, planName, site } from '../site.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -132,7 +132,7 @@ onMounted(loadApps)
             {{ isPaid ? 'Switch to Individual' : 'Upgrade to Individual' }}
           </button>
           <button
-            v-if="plan !== 'signal' && auth.signalBillingEnabled"
+            v-if="site.showSignal && plan !== 'signal' && auth.signalBillingEnabled"
             type="button"
             class="btn"
             :disabled="busy"
@@ -144,10 +144,10 @@ onMounted(loadApps)
             Manage billing
           </button>
         </div>
-        <p v-if="auth.billingEnabled && auth.signalBillingEnabled && plan !== 'signal'" class="muted small">
+        <p v-if="!auth.billingEnabled" class="muted small">Billing is not enabled on this server.</p>
+        <p v-else-if="site.showSignal && auth.signalBillingEnabled && plan !== 'signal'" class="muted small">
           Signal adds page updates that readers can subscribe to by email.
         </p>
-        <p v-else class="muted small">Billing is not enabled on this server.</p>
       </section>
     </div>
 

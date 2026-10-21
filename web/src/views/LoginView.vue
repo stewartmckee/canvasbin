@@ -3,10 +3,11 @@ import { ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { login } from '../api.js'
 import { auth, continueAfterSignIn, safeNext } from '../auth.js'
+import { site } from '../site.js'
 
 const route = useRoute()
 const router = useRouter()
-const plan = ['pro', 'signal', 'team'].includes(route.query.plan) ? route.query.plan : ''
+const plan = ['pro', 'team', ...(site.showSignal ? ['signal'] : [])].includes(route.query.plan) ? route.query.plan : ''
 const email = ref('')
 const password = ref('')
 const busy = ref(false)

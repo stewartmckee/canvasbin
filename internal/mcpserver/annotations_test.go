@@ -71,12 +71,28 @@ func TestToolAnnotations(t *testing.T) {
 	}
 }
 
-// Update emails can't be recalled, so the agent must get the wording approved first.
+// Update emails can't be recalled, so the agent must get the wording approved
+// first. Only accounts whose plan includes updates see the tools at all.
 func TestUpdateInstructionsRequireReview(t *testing.T) {
 	ctx := context.Background()
-	for _, on := range []bool{true, false} {
-		o := Options{Config: config.Config{Accounts: true, Updates: on}, Version: "test"}
-		srv := newServer(o, "https://cb.example", "", &store.User{ID: 1})
+	price := func(s string) *string { return &s }
+	signal := &store.User{ID: 1, SubscriptionStatus: "active", StripePriceID: price("price_signal")}
+	pro := &store.User{ID: 2, SubscriptionStatus: "active", StripePriceID: price("price_pro")}
+	cases := []struct {
+		name    string
+		updates bool
+		user    *store.User
+		want    bool
+	}{
+		{"signal", true, signal, true},
+		{"updates off", false, signal, false},
+		{"individual plan", true, pro, false},
+		{"anonymous", true, nil, false},
+	}
+	for _, tc := range cases {
+		on := tc.want
+		o := Options{Config: config.Config{Accounts: true, Updates: tc.updates, StripePriceSignal: "price_signal"}, Version: "test"}
+		srv := newServer(o, "https://cb.example", "", tc.user)
 		st, ct := mcp.NewInMemoryTransports()
 		if _, err := srv.Connect(ctx, st, nil); err != nil {
 			t.Fatal(err)
@@ -86,16 +102,26 @@ func TestUpdateInstructionsRequireReview(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got := strings.Contains(cs.InitializeResult().Instructions, "publish it now or schedule it"); got != on {
-			t.Errorf("updates=%v: review instruction present = %v", on, got)
+			t.Errorf("%s: review instruction present = %v", tc.name, got)
 		}
 		res, err := cs.ListTools(ctx, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
+		listed := false
 		for _, tool := range res.Tools {
-			if tool.Name == "post_update" && !strings.Contains(tool.Description, "approve") {
-				t.Errorf("post_update should require approval: %s", tool.Description)
+			if tool.Name == "post_update" {
+				listed = true
+				if !strings.Contains(tool.Description, "approve") {
+					t.Errorf("post_update should require approval: %s", tool.Description)
+				}
 			}
+			if strings.Contains(tool.Description, "Signal") {
+				t.Errorf("%s: %s names the unlisted Signal plan", tc.name, tool.Name)
+			}
+		}
+		if listed != on {
+			t.Errorf("%s: post_update listed = %v, want %v", tc.name, listed, on)
 		}
 		cs.Close()
 	}

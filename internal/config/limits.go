@@ -63,8 +63,15 @@ func UnverifiedError(base string) error {
 		store.ErrUnverified, base)
 }
 
+// SignalListed is whether the Signal plan is offered publicly. While it isn't,
+// messages don't name it; keep in step with showSignal in web/src/site.js.
+const SignalListed = false
+
 // UpdatesPlanError explains that page updates come with the Signal plan.
 func (c Config) UpdatesPlanError(base string) error {
+	if !SignalListed {
+		return fmt.Errorf("%w: page updates aren't available on this account's plan", store.ErrUpdatesNotInPlan)
+	}
 	if c.SignalBillingEnabled() {
 		return fmt.Errorf("%w: page updates and email subscribers are part of the Signal plan (%s). The page owner can upgrade at %s/pricing",
 			store.ErrUpdatesNotInPlan, SignalPrice, base)

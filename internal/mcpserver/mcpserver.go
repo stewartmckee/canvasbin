@@ -98,7 +98,7 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	if o.Config.Accounts {
 		text = accountInstructions
 	}
-	if o.Config.Updates {
+	if offersUpdates(o.Config, user) {
 		text += updateInstructions
 	}
 	s := mcp.NewServer(&mcp.Implementation{

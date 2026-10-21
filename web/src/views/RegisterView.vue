@@ -4,11 +4,12 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { register } from '../api.js'
 import { auth, continueAfterSignIn, safeNext } from '../auth.js'
 import { track } from '../analytics.js'
+import { site } from '../site.js'
 
 const route = useRoute()
 const router = useRouter()
 const next = safeNext(route.query.next)
-const plan = ['pro', 'signal', 'team'].includes(route.query.plan) ? route.query.plan : ''
+const plan = ['pro', 'team', ...(site.showSignal ? ['signal'] : [])].includes(route.query.plan) ? route.query.plan : ''
 const loginQuery = { ...(next !== '/' && { next }), ...(plan && { plan }) }
 const loginLink = { path: '/login', query: loginQuery }
 

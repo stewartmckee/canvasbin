@@ -31,7 +31,7 @@ async function choose(next) {
 </script>
 
 <template>
-  <div class="plans plans-4">
+  <div class="plans" :class="site.showSignal ? 'plans-4' : 'plans-3'">
     <article class="plan">
       <h3>Free</h3>
       <p class="price">£0</p>
@@ -80,7 +80,7 @@ async function choose(next) {
       </button>
       <p v-if="error && errorPlan === 'pro'" class="field-error">{{ error }}</p>
     </article>
-    <article class="plan">
+    <article v-if="site.showSignal" class="plan">
       <h3>Signal</h3>
       <p class="price">
         {{ site.signalPrice }}<span class="per">/{{ site.proInterval }}</span>
