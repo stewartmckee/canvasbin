@@ -5,15 +5,16 @@ go 1.27
 require (
 	github.com/chromedp/cdproto v0.157.7
 	github.com/chromedp/chromedp v0.19.1
+	github.com/coder/websocket v1.8.15
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/stripe/stripe-go/v82 v82.5.1
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.58.0
+	golang.org/x/net v0.60.0
 )
 
 require (
-	github.com/coder/websocket v1.8.15 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
