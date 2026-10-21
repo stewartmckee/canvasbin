@@ -215,3 +215,47 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE TRIGGER pages_notify_change
     AFTER UPDATE OR DELETE ON pages
     FOR EACH ROW EXECUTE FUNCTION notify_page_change();
+
+-- Public page updates (UPDATES=on): append-only posts and email subscribers.
+ALTER TABLE pages ADD COLUMN IF NOT EXISTS updates_enabled boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS page_updates (
+    id                 bigserial PRIMARY KEY,
+    page_id            bigint      NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    title              text        NOT NULL DEFAULT '',
+    body               text        NOT NULL DEFAULT '',
+    created_by_user_id bigint      REFERENCES users(id) ON DELETE SET NULL,
+    created_at         timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS page_updates_page_idx ON page_updates (page_id, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS page_update_subscribers (
+    id                bigserial PRIMARY KEY,
+    page_id           bigint      NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    email             text        NOT NULL,
+    status            text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'unsubscribed')),
+    confirm_token     text        NOT NULL UNIQUE,
+    unsubscribe_token text        NOT NULL UNIQUE,
+    created_at        timestamptz NOT NULL DEFAULT now(),
+    confirmed_at      timestamptz,
+    UNIQUE (page_id, email)
+);
+
+CREATE INDEX IF NOT EXISTS page_update_subscribers_page_active_idx
+    ON page_update_subscribers (page_id) WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS notification_outbox (
+    id            bigserial PRIMARY KEY,
+    page_update_id bigint     NOT NULL REFERENCES page_updates(id) ON DELETE CASCADE,
+    subscriber_id bigint      NOT NULL REFERENCES page_update_subscribers(id) ON DELETE CASCADE,
+    read_key      text        NOT NULL DEFAULT '',
+    send_after    timestamptz NOT NULL DEFAULT now(),
+    attempts      int         NOT NULL DEFAULT 0,
+    last_error    text        NOT NULL DEFAULT '',
+    sent_at       timestamptz,
+    UNIQUE (page_update_id, subscriber_id)
+);
+
+CREATE INDEX IF NOT EXISTS notification_outbox_pending_idx
+    ON notification_outbox (send_after) WHERE sent_at IS NULL;

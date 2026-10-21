@@ -71,7 +71,7 @@ func run() error {
 		Store: st, PublicBaseURL: base, CreateLimit: limiter, Version: version, Config: cfg,
 		Analytics: srv.Analytics,
 	}
-	if cfg.Accounts {
+	if cfg.Accounts || cfg.Updates {
 		srv.Mailer = mail.New(cfg.MailgunKey, cfg.MailgunDomain, cfg.MailFrom)
 		srv.Billing = billing.New(cfg, st)
 		srv.AuthLimit = ratelimit.New(30, 10*time.Minute)
@@ -85,6 +85,12 @@ func run() error {
 		mcpOpts.MailLimit = srv.MailLimit
 		go pruneExpired(ctx, st)
 		slog.Info("accounts enabled", "billing", srv.Billing.Enabled())
+	}
+	if cfg.Updates {
+		mcpOpts.Mailer = srv.Mailer
+		mcpOpts.MailLimit = ratelimit.New(5, time.Hour)
+		go srv.RunUpdateOutboxWorker(ctx)
+		slog.Info("public page updates enabled", "mode", cfg.UpdatesMode)
 	}
 	srv.MCP = mcpserver.Handler(mcpOpts)
 	hs := &http.Server{

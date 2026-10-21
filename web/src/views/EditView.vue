@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import SharePanel from '../components/SharePanel.vue'
 import TeamPagePanel from '../components/TeamPagePanel.vue'
+import UpdatesPanel from '../components/UpdatesPanel.vue'
 import UpgradePrompt from '../components/UpgradePrompt.vue'
 import { claimPage, deletePage, getPage, updatePage } from '../api.js'
 import { accountsEnabled, currentUser, loadMe } from '../auth.js'
@@ -181,6 +182,7 @@ async function remove() {
     </div>
     <template v-else-if="page">
       <SharePanel :page="page" :fresh="fresh" />
+      <UpdatesPanel :page="page" />
       <p v-if="page.agentic_only" class="notice">
         <span class="badge">Agent scratchpad</span>
         Hidden from your library unless you turn on “Show agent scratchpads” on the Pages screen.

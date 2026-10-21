@@ -10,6 +10,7 @@ export const auth = reactive({
   freeQuota: 5,
   proQuota: 100,
   teamQuota: 1000,
+  updates: false,
   me: null,
 })
 
@@ -47,6 +48,7 @@ export function initAuth() {
         if (cfg?.free_quota) auth.freeQuota = cfg.free_quota
         if (cfg?.pro_quota) auth.proQuota = cfg.pro_quota
         if (cfg?.team_quota) auth.teamQuota = cfg.team_quota
+        auth.updates = Boolean(cfg?.updates)
       } catch {
         auth.accounts = false
       }

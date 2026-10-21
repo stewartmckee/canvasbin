@@ -32,6 +32,8 @@ export const getPage = (key) => request('GET', `/api/pages/${encodeURIComponent(
 export const updatePage = (key, page) => request('PUT', `/api/pages/${encodeURIComponent(key)}`, page)
 export const deletePage = (key) => request('DELETE', `/api/pages/${encodeURIComponent(key)}`)
 export const renderPreview = (page) => request('POST', '/api/render', page)
+export const setUpdatesEnabled = (key, enabled) =>
+  request('PATCH', `/api/pages/${encodeURIComponent(key)}/updates-settings`, { updates_enabled: enabled })
 
 // Config and auth
 export const getConfig = () => request('GET', '/api/config')
