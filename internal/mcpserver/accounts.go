@@ -30,7 +30,7 @@ create_page publishes into the user's own library and counts toward their page q
 - list_comments / add_comment: read and post comments on a team page. Team members only.
 - get_style_guide / set_style_guide: read, create, or update a team's style guide. Team plan only. Any member of that team can create or update it. set_style_guide creates the guide when the team has none and replaces it when one already exists. Pass an empty style_guide to clear it.
 
-When the page quota is full, create_page and claim_page return an error that explains the user's options. Only delete pages to make room if the user asks.
+When the page quota is full, create_page and claim_page return an error that explains the user's options. Users delete pages they no longer need to stay within quota—when they ask to free space, stay under quota, remove old pages, or delete a specific page, call delete_page with that page's write key or write URL (list_pages helps find titles and keys). If they want several removed but do not name them, list their library, suggest which pages look disposable, and delete the ones they confirm.
 
 Style guides are a Team plan feature. Before create_page into a team, call get_style_guide with that team's name or id. If it returns a style guide, follow it when you write the page. If the guide is empty, or the team's plan is not active, write the page as usual. Personal pages have no style guide. When the user wants to set or change how a team's pages are written, call set_style_guide: it creates the guide if there isn't one and updates it if there is.
 
