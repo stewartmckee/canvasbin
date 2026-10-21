@@ -47,14 +47,15 @@ var (
 )
 
 type Page struct {
-	ID        int64     `json:"-"`
-	OwnerID   *int64    `json:"-"`
-	TeamID    *int64    `json:"-"`
-	Title     string    `json:"title"`
-	Format    string    `json:"format"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"-"`
+	OwnerID     *int64    `json:"-"`
+	TeamID      *int64    `json:"-"`
+	Title       string    `json:"title"`
+	Format      string    `json:"format"`
+	Content     string    `json:"content"`
+	AgenticOnly bool      `json:"agentic_only"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Access is a page as seen through a particular key.
@@ -73,9 +74,10 @@ type Access struct {
 
 // Changes holds optional fields for an update.
 type Changes struct {
-	Title   *string
-	Format  *string
-	Content *string
+	Title        *string
+	Format       *string
+	Content      *string
+	AgenticOnly  *bool
 }
 
 type Store struct {
@@ -132,23 +134,26 @@ func cleanTitle(t string) string {
 	return t
 }
 
-func (s *Store) Create(ctx context.Context, title, format, content string) (*Access, error) {
-	return s.create(ctx, nil, nil, title, format, content)
+func (s *Store) Create(ctx context.Context, title, format, content string, agenticOnly bool) (*Access, error) {
+	return s.create(ctx, nil, nil, title, format, content, agenticOnly)
 }
 
 // CreateOwned creates a page owned by userID. The read key is retained on the
 // row (see schema) so the owner's library can link to the page.
-func (s *Store) CreateOwned(ctx context.Context, ownerID int64, title, format, content string) (*Access, error) {
-	return s.create(ctx, &ownerID, nil, title, format, content)
+func (s *Store) CreateOwned(ctx context.Context, ownerID int64, title, format, content string, agenticOnly bool) (*Access, error) {
+	return s.create(ctx, &ownerID, nil, title, format, content, agenticOnly)
 }
 
 // CreateInTeam creates a team page with userID as its creator. Callers check
 // membership, subscription and quota first.
-func (s *Store) CreateInTeam(ctx context.Context, userID, teamID int64, title, format, content string) (*Access, error) {
-	return s.create(ctx, &userID, &teamID, title, format, content)
+func (s *Store) CreateInTeam(ctx context.Context, userID, teamID int64, title, format, content string, agenticOnly bool) (*Access, error) {
+	return s.create(ctx, &userID, &teamID, title, format, content, agenticOnly)
 }
 
-func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, format, content string) (*Access, error) {
+func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, format, content string, agenticOnly bool) (*Access, error) {
+	if agenticOnly {
+		teamID = nil
+	}
 	format, err := NormalizeFormat(format)
 	if err != nil {
 		return nil, err
@@ -162,16 +167,16 @@ func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, forma
 	}
 	readKey := keys.ReadFromWrite(writeKey)
 	a := &Access{CanWrite: true, ReadKey: readKey, WriteKey: writeKey}
-	a.Title, a.Format, a.Content, a.OwnerID, a.TeamID = cleanTitle(title), format, content, ownerID, teamID
+	a.Title, a.Format, a.Content, a.OwnerID, a.TeamID, a.AgenticOnly = cleanTitle(title), format, content, ownerID, teamID, agenticOnly
 	var storedReadKey *string
 	if ownerID != nil {
 		storedReadKey = &readKey
 		a.Role = RoleOwner
 	}
 	err = s.db.QueryRow(ctx,
-		`INSERT INTO pages (title, format, content, read_key_hash, write_key_hash, owner_id, read_key, team_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at`,
-		a.Title, a.Format, a.Content, keys.Hash(readKey), keys.Hash(writeKey), ownerID, storedReadKey, teamID,
+		`INSERT INTO pages (title, format, content, read_key_hash, write_key_hash, owner_id, read_key, team_id, agentic_only)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at, updated_at`,
+		a.Title, a.Format, a.Content, keys.Hash(readKey), keys.Hash(writeKey), ownerID, storedReadKey, teamID, agenticOnly,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -185,9 +190,9 @@ func (s *Store) Get(ctx context.Context, key string) (*Access, error) {
 	var a Access
 	var noReadKey bool
 	err := s.db.QueryRow(ctx,
-		`SELECT id, owner_id, title, format, content, created_at, updated_at, write_key_hash = $1, read_key IS NULL
+		`SELECT id, owner_id, team_id, title, format, content, agentic_only, created_at, updated_at, write_key_hash = $1, read_key IS NULL
 		 FROM pages WHERE read_key_hash = $1 OR write_key_hash = $1`, h,
-	).Scan(&a.ID, &a.OwnerID, &a.Title, &a.Format, &a.Content, &a.CreatedAt, &a.UpdatedAt, &a.CanWrite, &noReadKey)
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt, &a.CanWrite, &noReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -221,14 +226,17 @@ func (s *Store) Update(ctx context.Context, writeKey string, c Changes) (*Access
 		t := cleanTitle(*c.Title)
 		c.Title = &t
 	}
+	clearTeam := c.AgenticOnly != nil && *c.AgenticOnly
 	tag, err := s.db.Exec(ctx,
 		`UPDATE pages SET
 		   title = COALESCE($2, title),
 		   format = COALESCE($3, format),
 		   content = COALESCE($4, content),
+		   agentic_only = COALESCE($5, agentic_only),
+		   team_id = CASE WHEN $6 THEN NULL ELSE team_id END,
 		   updated_at = now()
 		 WHERE write_key_hash = $1`,
-		keys.Hash(writeKey), c.Title, c.Format, c.Content)
+		keys.Hash(writeKey), c.Title, c.Format, c.Content, c.AgenticOnly, clearTeam)
 	if err != nil {
 		return nil, err
 	}

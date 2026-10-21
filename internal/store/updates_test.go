@@ -2,27 +2,13 @@ package store
 
 import (
 	"context"
-	"os"
 	"testing"
 )
-
-func testStore(t *testing.T) *Store {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	st, err := Open(context.Background(), dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(st.Close)
-	return st
-}
 
 func TestPageUpdatesFlow(t *testing.T) {
 	ctx := context.Background()
 	st := testStore(t)
-	a, err := st.Create(ctx, "News", "markdown", "# hi")
+	a, err := st.Create(ctx, "News", "markdown", "# hi", false)
 	if err != nil {
 		t.Fatal(err)
 	}

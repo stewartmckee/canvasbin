@@ -30,7 +30,9 @@ A page URL's extension picks the view: /{key} opens the Canvasbin app, /{key}.ht
 - read_url: the app in read-only mode (preview and source).
 - write_url: the browser editor. The key in it grants edit and delete, so share it only with collaborators.
 
-You do not need the browser to make changes: call update_page or delete_page with the write key (or write_url) directly. Keep write_key if you will update the page later. Tools that take a "key" accept the bare key or any Canvasbin URL. HTML pages may be a fragment or a full document with <html>; scripts run in a sandbox.`
+You do not need the browser to make changes: call update_page or delete_page with the write key (or write_url) directly. Keep write_key if you will update the page later. Tools that take a "key" accept the bare key or any Canvasbin URL. HTML pages may be a fragment or a full document with <html>; scripts run in a sandbox.
+
+For data the user wants to store outside the chat (cross-platform context, chat backups, scratch notes) rather than share as a polished page, create or update with agentic_only true. Those pages are hidden from the human library by default but appear in list_pages with agentic_only set. Passing team with agentic_only true still stores a personal scratchpad.`
 
 type Options struct {
 	Store         *store.Store
@@ -147,10 +149,11 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 }
 
 type CreateInput struct {
-	Content string `json:"content" jsonschema:"page source: HTML (fragment or full document) or Markdown"`
-	Format  string `json:"format,omitempty" jsonschema:"html (default) or markdown"`
-	Title   string `json:"title,omitempty" jsonschema:"title shown in the browser tab"`
-	Team    string `json:"team,omitempty" jsonschema:"name or id of one of the user's teams to create the page in; omit for a personal page"`
+	Content     string `json:"content" jsonschema:"page source: HTML (fragment or full document) or Markdown"`
+	Format      string `json:"format,omitempty" jsonschema:"html (default) or markdown"`
+	Title       string `json:"title,omitempty" jsonschema:"title shown in the browser tab"`
+	Team        string `json:"team,omitempty" jsonschema:"name or id of one of the user's teams to create the page in; omit for a personal page"`
+	AgenticOnly *bool  `json:"agentic_only,omitempty" jsonschema:"when true, creates an agent scratchpad (hidden from the web library by default); team is ignored and the page is stored as personal"`
 }
 
 type GetInput struct {
@@ -158,11 +161,12 @@ type GetInput struct {
 }
 
 type UpdateInput struct {
-	Key     string  `json:"key" jsonschema:"write key or write URL"`
-	Content *string `json:"content,omitempty" jsonschema:"new full page source; replaces the existing content"`
-	Format  *string `json:"format,omitempty" jsonschema:"html or markdown"`
-	Title   *string `json:"title,omitempty" jsonschema:"new title"`
-	Notify  *bool   `json:"notify,omitempty" jsonschema:"when updates use notify_on_page_edit mode, email subscribers about this edit"`
+	Key         string  `json:"key" jsonschema:"write key or write URL"`
+	Content     *string `json:"content,omitempty" jsonschema:"new full page source; replaces the existing content"`
+	Format      *string `json:"format,omitempty" jsonschema:"html or markdown"`
+	Title       *string `json:"title,omitempty" jsonschema:"new title"`
+	AgenticOnly *bool   `json:"agentic_only,omitempty" jsonschema:"mark or unmark the page as an agent scratchpad"`
+	Notify      *bool   `json:"notify,omitempty" jsonschema:"when updates use notify_on_page_edit mode, email subscribers about this edit"`
 }
 
 type DeleteInput struct {
@@ -170,18 +174,19 @@ type DeleteInput struct {
 }
 
 type PageResult struct {
-	Title     string    `json:"title"`
-	Format    string    `json:"format"`
-	Content   *string   `json:"content,omitempty"`
-	CanWrite  bool      `json:"can_write"`
-	ReadURL   string    `json:"read_url"`
-	WriteURL  string    `json:"write_url,omitempty"`
-	HTMLURL   string    `json:"html_url"`
-	PDFURL    string    `json:"pdf_url"`
-	RawURL    string    `json:"raw_url"`
-	ReadKey   string    `json:"read_key"`
-	WriteKey  string    `json:"write_key,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Title       string    `json:"title"`
+	Format      string    `json:"format"`
+	Content     *string   `json:"content,omitempty"`
+	AgenticOnly bool      `json:"agentic_only"`
+	CanWrite    bool      `json:"can_write"`
+	ReadURL     string    `json:"read_url"`
+	WriteURL    string    `json:"write_url,omitempty"`
+	HTMLURL     string    `json:"html_url"`
+	PDFURL      string    `json:"pdf_url"`
+	RawURL      string    `json:"raw_url"`
+	ReadKey     string    `json:"read_key"`
+	WriteKey    string    `json:"write_key,omitempty"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type DeleteResult struct {
@@ -191,7 +196,7 @@ type DeleteResult struct {
 func (t *tools) result(a *store.Access, withContent bool) PageResult {
 	l := links.For(t.base, a.ReadKey, a.WriteKey)
 	r := PageResult{
-		Title: a.Title, Format: a.Format, CanWrite: a.CanWrite,
+		Title: a.Title, Format: a.Format, AgenticOnly: a.AgenticOnly, CanWrite: a.CanWrite,
 		ReadURL: l.ReadURL, WriteURL: l.WriteURL, HTMLURL: l.HTMLURL, PDFURL: l.PDFURL, RawURL: l.RawURL,
 		ReadKey: a.ReadKey, WriteKey: a.WriteKey, UpdatedAt: a.UpdatedAt,
 	}
@@ -213,12 +218,13 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 	if t.Config.Accounts && t.user == nil {
 		return nil, PageResult{}, errors.New("sign in to create pages")
 	}
-	if t.user != nil && in.Team != "" {
+	agentic := in.AgenticOnly != nil && *in.AgenticOnly
+	if t.user != nil && in.Team != "" && !agentic {
 		team, terr := t.teamForCreate(ctx, in.Team)
 		if terr != nil {
 			return nil, PageResult{}, terr
 		}
-		a, err = t.Store.CreateInTeam(ctx, t.user.ID, team.ID, in.Title, in.Format, in.Content)
+		a, err = t.Store.CreateInTeam(ctx, t.user.ID, team.ID, in.Title, in.Format, in.Content, false)
 		if err == nil {
 			t.logPage(ctx, a, store.ActivityPageCreated)
 		}
@@ -226,9 +232,9 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 		if err := t.checkQuota(ctx); err != nil {
 			return nil, PageResult{}, err
 		}
-		a, err = t.Store.CreateOwned(ctx, t.user.ID, in.Title, in.Format, in.Content)
+		a, err = t.Store.CreateOwned(ctx, t.user.ID, in.Title, in.Format, in.Content, agentic)
 	} else {
-		a, err = t.Store.Create(ctx, in.Title, in.Format, in.Content)
+		a, err = t.Store.Create(ctx, in.Title, in.Format, in.Content, agentic)
 	}
 	if err != nil {
 		return nil, PageResult{}, err
@@ -262,10 +268,10 @@ func (t *tools) update(ctx context.Context, _ *mcp.CallToolRequest, in UpdateInp
 	if err != nil {
 		return nil, PageResult{}, store.ErrNotFound
 	}
-	if in.Content == nil && in.Format == nil && in.Title == nil {
-		return nil, PageResult{}, errors.New("nothing to update: pass content, title or format")
+	if in.Content == nil && in.Format == nil && in.Title == nil && in.AgenticOnly == nil {
+		return nil, PageResult{}, errors.New("nothing to update: pass content, title, format or agentic_only")
 	}
-	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content}
+	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content, AgenticOnly: in.AgenticOnly}
 	var a *store.Access
 	if t.user != nil {
 		a, err = t.Store.UpdateForUser(ctx, key, t.user.ID, changes)

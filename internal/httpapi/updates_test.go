@@ -34,7 +34,7 @@ func TestUpdatesDisabled(t *testing.T) {
 	t.Cleanup(st.Close)
 	s := &Server{
 		Store: st, Config: config.Config{Updates: false},
-		Web: fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
+		Web:  fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
 		Live: live.New(10),
 	}
 	srv := httptest.NewServer(s.Handler())
@@ -59,13 +59,13 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 	cfg := config.Config{Updates: true, UpdatesMode: config.UpdatesModeFeed, MailgunKey: "x", MailgunDomain: "t", MailFrom: "t <t@t>"}
 	s := &Server{
 		Store: st, Config: cfg, Mailer: m,
-		Web: fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
+		Web:  fstest.MapFS{"index.html": {Data: []byte("<html></html>")}},
 		Live: live.New(10),
 	}
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 
-	a, err := st.Create(context.Background(), "Site", "html", "<p>x</p>")
+	a, err := st.Create(context.Background(), "Site", "html", "<p>x</p>", false)
 	if err != nil {
 		t.Fatal(err)
 	}

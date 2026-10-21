@@ -149,7 +149,7 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 	st, ctx := testStore(t), context.Background()
 	owner, other := newUser(t, st, "owner"), newUser(t, st, "other")
 
-	a, err := st.CreateOwned(ctx, owner.ID, "Mine", "markdown", "# hi")
+	a, err := st.CreateOwned(ctx, owner.ID, "Mine", "markdown", "# hi", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,14 +201,14 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 	if _, err := st.ShareWith(ctx, a.ID, owner.ID, owner.Email, RoleViewer); !errors.Is(err, ErrConflict) {
 		t.Fatalf("share with owner: %v", err)
 	}
-	lib, _ := st.ListOwnedAndShared(ctx, other.ID)
+	lib, _ := st.ListOwnedAndShared(ctx, other.ID, true)
 	if len(lib) != 1 || lib[0].Role != RoleEditor || !lib[0].CanWrite || lib[0].ReadKey != a.ReadKey || lib[0].OwnerEmail != owner.Email {
 		t.Fatalf("library: %+v", lib)
 	}
 	if ok, err := st.RemoveShare(ctx, a.ID, other.Email); err != nil || !ok {
 		t.Fatalf("remove: %v %v", ok, err)
 	}
-	if lib, _ = st.ListOwnedAndShared(ctx, other.ID); len(lib) != 0 {
+	if lib, _ = st.ListOwnedAndShared(ctx, other.ID, true); len(lib) != 0 {
 		t.Fatalf("library should be empty: %+v", lib)
 	}
 
@@ -244,7 +244,7 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 func TestClaim(t *testing.T) {
 	st, ctx := testStore(t), context.Background()
 	u1, u2 := newUser(t, st, "c1"), newUser(t, st, "c2")
-	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>")
+	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestClaim(t *testing.T) {
 	if _, err := st.Claim(ctx, anon.ReadKey, u2.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("read key claim: %v", err)
 	}
-	if lib, _ := st.ListOwnedAndShared(ctx, u1.ID); len(lib) != 1 || lib[0].ReadKey != anon.ReadKey {
+	if lib, _ := st.ListOwnedAndShared(ctx, u1.ID, true); len(lib) != 1 || lib[0].ReadKey != anon.ReadKey {
 		t.Fatalf("library after claim: %+v", lib)
 	}
 }
@@ -344,6 +344,36 @@ func TestOAuthStore(t *testing.T) {
 	}
 	if apps, _ := st.ListConnectedApps(ctx, u.ID); len(apps) != 0 {
 		t.Fatalf("apps after revoke: %+v", apps)
+	}
+}
+
+func TestAgenticOnlyPages(t *testing.T) {
+	st, ctx := testStore(t), context.Background()
+	u := newUser(t, st, "agentic")
+	normal, err := st.CreateOwned(ctx, u.ID, "Visible", "html", "<p>hi</p>", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scratch, err := st.CreateOwned(ctx, u.ID, "Scratch", "markdown", "# notes", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scratch.AgenticOnly != true {
+		t.Fatal("expected agentic_only")
+	}
+	lib, err := st.ListOwnedAndShared(ctx, u.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lib) != 1 || lib[0].ReadKey != normal.ReadKey {
+		t.Fatalf("default library: %+v", lib)
+	}
+	lib, err = st.ListOwnedAndShared(ctx, u.ID, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lib) != 2 {
+		t.Fatalf("full library: %+v", lib)
 	}
 }
 

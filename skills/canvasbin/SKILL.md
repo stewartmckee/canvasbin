@@ -14,6 +14,8 @@ Canvasbin hosts HTML and Markdown pages at unguessable URLs. The `canvasbin` MCP
 
 Don't publish secrets, credentials, or personal data the user hasn't asked to share. Anyone with a view link can open the page.
 
+For data the user wants stored outside the chat (cross-platform context, chat backups, scratch notes) rather than shared as a polished page, use `agentic_only: true` on `create_page` or `update_page`. Those pages are hidden from the human web library by default but appear in `list_pages` with `agentic_only` set. Passing `team` with `agentic_only: true` still creates a personal scratchpad.
+
 ## How
 
 1. If you are publishing into a team, call `get_style_guide` for that team first. When it returns a style guide, write the page in that style. Style guides are a Team plan feature; if the guide is empty or the plan is not active, write the page as usual. Personal pages have no style guide.

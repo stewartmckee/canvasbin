@@ -335,7 +335,7 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 		t.Fatalf("tools/list: %d %s", st, body)
 	}
 	// A pre-existing unowned page can still be edited by key once signed in.
-	legacy, err := e.st.Create(context.Background(), "anon", "html", "<p>anon</p>")
+	legacy, err := e.st.Create(context.Background(), "anon", "html", "<p>anon</p>", false)
 	if err != nil {
 		t.Fatal(err)
 	}
