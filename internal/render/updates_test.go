@@ -55,7 +55,7 @@ func TestUpdatesBlockFoldsOlder(t *testing.T) {
 	if !strings.Contains(out, "21 Oct 2026") {
 		t.Error("date not formatted")
 	}
-	d := strings.Index(out, "<details>")
+	d := strings.Index(out, "<details")
 	if d < 0 || strings.Index(out, `id="update-2"`) > d || strings.Index(out, `id="update-1"`) < d {
 		t.Error("newest update should be shown and older ones folded")
 	}
