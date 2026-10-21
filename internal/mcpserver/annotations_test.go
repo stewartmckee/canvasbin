@@ -71,6 +71,36 @@ func TestToolAnnotations(t *testing.T) {
 	}
 }
 
+// Update emails can't be recalled, so the agent must get the wording approved first.
+func TestUpdateInstructionsRequireReview(t *testing.T) {
+	ctx := context.Background()
+	for _, on := range []bool{true, false} {
+		o := Options{Config: config.Config{Accounts: true, Updates: on}, Version: "test"}
+		srv := newServer(o, "https://cb.example", "", &store.User{ID: 1})
+		st, ct := mcp.NewInMemoryTransports()
+		if _, err := srv.Connect(ctx, st, nil); err != nil {
+			t.Fatal(err)
+		}
+		cs, err := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "1"}, nil).Connect(ctx, ct, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(cs.InitializeResult().Instructions, "ask them to confirm"); got != on {
+			t.Errorf("updates=%v: review instruction present = %v", on, got)
+		}
+		res, err := cs.ListTools(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tool := range res.Tools {
+			if tool.Name == "post_update" && !strings.Contains(tool.Description, "approve") {
+				t.Errorf("post_update should require approval: %s", tool.Description)
+			}
+		}
+		cs.Close()
+	}
+}
+
 func TestAnonymousToolsOmitStyleGuide(t *testing.T) {
 	ctx := context.Background()
 	srv := newServer(Options{Version: "test"}, "https://cb.example", "", nil)

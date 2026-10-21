@@ -98,6 +98,9 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	if o.Config.Accounts {
 		text = accountInstructions
 	}
+	if o.Config.Updates {
+		text += updateInstructions
+	}
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:        "canvasbin",
 		Title:       "Canvasbin",
@@ -166,7 +169,7 @@ type UpdateInput struct {
 	Format      *string `json:"format,omitempty" jsonschema:"html or markdown"`
 	Title       *string `json:"title,omitempty" jsonschema:"new title"`
 	AgenticOnly *bool   `json:"agentic_only,omitempty" jsonschema:"mark or unmark the page as an agent scratchpad"`
-	Notify      *bool   `json:"notify,omitempty" jsonschema:"when updates use notify_on_page_edit mode, email subscribers about this edit"`
+	Notify      *bool   `json:"notify,omitempty" jsonschema:"when updates use notify_on_page_edit mode, email subscribers about this edit; confirm with the user before setting it"`
 }
 
 type DeleteInput struct {

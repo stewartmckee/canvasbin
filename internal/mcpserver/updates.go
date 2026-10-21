@@ -11,6 +11,11 @@ import (
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
 
+// updateInstructions is appended to the server instructions when page updates are on.
+const updateInstructions = `
+
+Page updates are emailed to every subscriber as soon as they are posted and can't be recalled. Before you call post_update (or update_page with notify: true), show the user the exact title and body you will post, and the page it will go on, and ask them to confirm. Only post once they approve that wording; if they ask for changes, show the revised draft again. Don't treat the original request to post an update as approval of your draft, because you may have added or changed details.`
+
 func (t *tools) addUpdateTools(s *mcp.Server) {
 	if !t.Config.Updates {
 		return
@@ -18,7 +23,7 @@ func (t *tools) addUpdateTools(s *mcp.Server) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "post_update",
 		Title:       "Post page update",
-		Description: "Publish an append-only update (title and Markdown body) on a page with updates enabled. Subscribers receive email when configured. Updates need the page owner to be on the Signal plan.",
+		Description: "Publish an append-only update (title and Markdown body) on a page with updates enabled. Subscribers receive email when configured, and a posted update can't be recalled. Before calling, show the user the exact title and body and the page it will go on, and post only after they approve that wording. Updates need the page owner to be on the Signal plan.",
 		Annotations: writeTool(false, false, false),
 	}, t.postUpdate)
 	mcp.AddTool(s, &mcp.Tool{
