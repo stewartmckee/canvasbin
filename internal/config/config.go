@@ -44,10 +44,19 @@ type Config struct {
 	UmamiURL       string
 	UmamiWebsiteID string
 
+	Updates     bool
+	UpdatesMode string // feed (default) or notify_on_page_edit
+	ProductName string
+
 	FreeQuota int
 	ProQuota  int
 	TeamQuota int
 }
+
+const (
+	UpdatesModeFeed           = "feed"
+	UpdatesModeNotifyOnEdit   = "notify_on_page_edit"
+)
 
 // Load reads configuration from the process environment.
 func Load() Config {
@@ -76,6 +85,9 @@ func fromGetenv(get func(string) string) Config {
 		OpenAIAppsChallenge:  strings.TrimSpace(get("OPENAI_APPS_CHALLENGE")),
 		UmamiURL:             strings.TrimSpace(get("UMAMI_URL")),
 		UmamiWebsiteID:       strings.TrimSpace(get("UMAMI_WEBSITE_ID")),
+		Updates:              truthy(get("UPDATES")),
+		UpdatesMode:          def("UPDATES_MODE", UpdatesModeFeed),
+		ProductName:          strings.TrimSpace(get("PRODUCT_NAME")),
 		FreeQuota:            FreeQuota,
 		ProQuota:             ProQuota,
 		TeamQuota:            TeamQuota,
@@ -101,7 +113,26 @@ func (c Config) Validate() error {
 	if c.Accounts && c.MailgunKey == "" {
 		return errors.New("ACCOUNTS is on but MAILGUN_SENDING_KEY is not set")
 	}
+	if c.Updates && c.MailgunKey == "" {
+		return errors.New("UPDATES is on but MAILGUN_SENDING_KEY is not set")
+	}
+	if c.UpdatesMode != "" && c.UpdatesMode != UpdatesModeFeed && c.UpdatesMode != UpdatesModeNotifyOnEdit {
+		return errors.New("UPDATES_MODE must be feed or notify_on_page_edit")
+	}
 	return nil
+}
+
+// ProductNameOrDefault is the branding name for email and UI copy.
+func (c Config) ProductNameOrDefault() string {
+	if c.ProductName != "" {
+		return c.ProductName
+	}
+	return "Canvasbin"
+}
+
+// UpdatesFeed is true when page posts use the append-only feed (not notify-on-edit only).
+func (c Config) UpdatesFeed() bool {
+	return c.UpdatesMode == "" || c.UpdatesMode == UpdatesModeFeed
 }
 
 // BillingEnabled is true when Stripe checkout can be offered.

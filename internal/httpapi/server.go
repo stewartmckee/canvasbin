@@ -72,6 +72,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/pages/{key}/live", s.liveUpdates)
 	mux.HandleFunc("POST /api/render", s.preview)
 	mux.HandleFunc("GET /api/config", s.publicConfig)
+	s.registerUpdateRoutes(mux)
 	if s.accounts() {
 		s.accountRoutes(mux)
 		if s.OAuth == nil {
@@ -202,6 +203,8 @@ type pageResponse struct {
 	TeamName string `json:"team_name,omitempty"`
 	TeamRole string `json:"team_role,omitempty"`
 	links.Links
+	UpdatesEnabled   bool `json:"updates_enabled,omitempty"`
+	SubscriberCount  int  `json:"subscriber_count,omitempty"`
 }
 
 func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
@@ -217,6 +220,15 @@ func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
 	if a.TeamRole != "" {
 		out.TeamID, out.TeamName, out.TeamRole = a.TeamID, a.TeamName, a.TeamRole
 	}
+	if s.updatesOn() {
+		on, err := s.Store.UpdatesEnabled(r.Context(), a.ID)
+		if err == nil {
+			out.UpdatesEnabled = on
+			if on && a.CanWrite {
+				out.SubscriberCount, _ = s.Store.ActiveSubscriberCount(r.Context(), a.ID)
+			}
+		}
+	}
 	return out
 }
 
@@ -225,6 +237,7 @@ type pageInput struct {
 	Format  *string `json:"format"`
 	Content *string `json:"content"`
 	TeamID  *int64  `json:"team_id"`
+	Notify  *bool   `json:"notify,omitempty"`
 }
 
 // publicConfig tells the web UI which optional features are available.
@@ -232,6 +245,9 @@ func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := map[string]any{
 		"accounts":        s.accounts(),
 		"billing_enabled": s.accounts() && s.Billing != nil && s.Billing.Enabled(),
+		"updates":         s.updatesOn(),
+		"updates_mode":    s.Config.UpdatesMode,
+		"product_name":    s.Config.ProductNameOrDefault(),
 	}
 	if s.accounts() {
 		cfg["free_quota"], cfg["pro_quota"] = s.Config.PlanQuotas()
@@ -343,6 +359,9 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
+	if in.Notify != nil && *in.Notify {
+		s.NotifyPageEditSubscribers(r.Context(), a, true)
+	}
 	writeJSON(w, http.StatusOK, s.response(r, a))
 }
 
@@ -407,6 +426,7 @@ func (s *Server) view(w http.ResponseWriter, r *http.Request, key string) {
 	if s.Live != nil && r.URL.Query().Get("live") != "0" {
 		doc = render.WithLiveReload(doc, a.ReadKey, liveTime(a.UpdatedAt))
 	}
+	doc = s.injectUpdates(r.Context(), doc, a)
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Content-Security-Policy", viewCSP)

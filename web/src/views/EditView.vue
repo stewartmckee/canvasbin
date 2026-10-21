@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import PageEditor from '../components/PageEditor.vue'
 import SharePanel from '../components/SharePanel.vue'
 import TeamPagePanel from '../components/TeamPagePanel.vue'
+import UpdatesPanel from '../components/UpdatesPanel.vue'
 import UpgradePrompt from '../components/UpgradePrompt.vue'
 import { claimPage, deletePage, getPage, updatePage } from '../api.js'
 import { accountsEnabled, currentUser, loadMe } from '../auth.js'
@@ -181,6 +182,7 @@ async function remove() {
     </div>
     <template v-else-if="page">
       <SharePanel :page="page" :fresh="fresh" />
+      <UpdatesPanel :page="page" />
       <p v-if="showSignIn()" class="notice claim">
         Shared with you to edit?
         <RouterLink class="btn small" :to="signInRoute()">Sign in</RouterLink>

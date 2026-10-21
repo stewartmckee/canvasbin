@@ -21,6 +21,8 @@ type Sender interface {
 	SendInvite(ctx context.Context, email, link, inviter string) error
 	SendTeamInvite(ctx context.Context, email, link, inviter, team string) error
 	SendWelcome(ctx context.Context, email, base string) error
+	SendUpdateSubscribeConfirm(ctx context.Context, email, link, pageTitle, product string) error
+	SendUpdateNotification(ctx context.Context, email, product, pageTitle, updateTitle, summary, viewURL, unsubURL string) error
 }
 
 // Client is a Mailgun client. The API key is never logged or included in errors.

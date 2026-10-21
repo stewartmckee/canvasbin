@@ -142,6 +142,7 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	if o.Config.Accounts {
 		t.addAccountTools(s)
 	}
+	t.addUpdateTools(s)
 	return s
 }
 
@@ -161,6 +162,7 @@ type UpdateInput struct {
 	Content *string `json:"content,omitempty" jsonschema:"new full page source; replaces the existing content"`
 	Format  *string `json:"format,omitempty" jsonschema:"html or markdown"`
 	Title   *string `json:"title,omitempty" jsonschema:"new title"`
+	Notify  *bool   `json:"notify,omitempty" jsonschema:"when updates use notify_on_page_edit mode, email subscribers about this edit"`
 }
 
 type DeleteInput struct {
@@ -276,7 +278,27 @@ func (t *tools) update(ctx context.Context, _ *mcp.CallToolRequest, in UpdateInp
 	if err != nil {
 		return nil, PageResult{}, err
 	}
+	t.maybeNotifyPageEdit(ctx, a, in.Notify != nil && *in.Notify)
 	return nil, t.result(a, false), nil
+}
+
+func (t *tools) maybeNotifyPageEdit(ctx context.Context, a *store.Access, notify bool) {
+	if !t.Config.Updates || t.Config.UpdatesFeed() || !notify || t.Mailer == nil {
+		return
+	}
+	on, err := t.Store.UpdatesEnabled(ctx, a.ID)
+	if err != nil || !on {
+		return
+	}
+	title := a.Title
+	if title == "" {
+		title = "Page updated"
+	}
+	u, err := t.Store.CreatePageUpdate(ctx, a.ID, nil, title, "The page has been updated.")
+	if err != nil {
+		return
+	}
+	_, _ = t.Store.EnqueueUpdateNotifications(ctx, u.ID, a.ID, a.ReadKey)
 }
 
 func (t *tools) remove(ctx context.Context, _ *mcp.CallToolRequest, in DeleteInput) (*mcp.CallToolResult, DeleteResult, error) {

@@ -39,6 +39,13 @@ func TestLoadAccounts(t *testing.T) {
 	}
 }
 
+func TestValidateUpdatesNeedsMail(t *testing.T) {
+	c := fromGetenv(env(map[string]string{"UPDATES": "on"}))
+	if err := c.Validate(); err == nil {
+		t.Fatal("updates on without mailgun key should fail validation")
+	}
+}
+
 func TestQuota(t *testing.T) {
 	c := fromGetenv(env(nil))
 	cases := map[string]int{"": 5, "canceled": 5, "incomplete": 5, "unpaid": 5, "trialing": 100, "active": 100, "past_due": 100}
