@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stewartmckee/canvasbin/internal/auth"
 	"github.com/stewartmckee/canvasbin/internal/render"
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
@@ -136,7 +137,11 @@ func (s *Server) subscribePage(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	email := store.NormalizeEmail(in.Email)
+	email, err := auth.ValidateEmail(in.Email)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "enter a valid email address")
+		return
+	}
 	if !s.allowMail(w, email) {
 		return
 	}

@@ -120,6 +120,10 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 	if err != nil || pres.StatusCode != http.StatusNoContent || pres.Header.Get("Access-Control-Allow-Origin") != "*" {
 		t.Fatalf("subscribe preflight from a sandboxed page should be allowed: %v %v", pres, err)
 	}
+	bad, _ := json.Marshal(map[string]string{"email": "not-an-email"})
+	if res, err := http.Post(srv.URL+"/api/pages/"+a.ReadKey+"/subscribe", "application/json", bytes.NewReader(bad)); err != nil || res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("invalid email should be rejected: %v %v", res, err)
+	}
 	body, _ := json.Marshal(map[string]string{"email": "fan@example.com"})
 	res, err := http.Post(srv.URL+"/api/pages/"+a.ReadKey+"/subscribe", "application/json", bytes.NewReader(body))
 	if err != nil || res.StatusCode != 200 || res.Header.Get("Access-Control-Allow-Origin") != "*" {
