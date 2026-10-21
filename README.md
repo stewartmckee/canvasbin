@@ -42,6 +42,17 @@ Pages can be a fragment or a full HTML document. Markdown is rendered for
 you. Updates are live on the same URLs, so an agent can revise a page
 without minting a new link.
 
+### Agent scratchpads (`agentic_only`)
+
+Agents can create **agentic-only** pages: external scratchpads for context shared
+across MCP clients or backups of what matters from a chat. Set `agentic_only:
+true` on `create_page` or `update_page`. They stay out of the web library unless
+the user turns on “Show agent scratchpads”; `list_pages` always includes them
+with the flag set. Passing `team` with `agentic_only: true` stores a personal
+page, not a team page. See
+[Share context across platforms](https://canvasbin.dev/agent-scratchpad/share-context-across-platforms)
+and [Backup AI chats](https://canvasbin.dev/agent-scratchpad/backup-ai-chats).
+
 ## Hand it to an agent
 
 Point Claude Code, Cursor, Codex, or any MCP client at

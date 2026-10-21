@@ -2,6 +2,7 @@ import { assistants, connectHub } from './connect.js'
 import { offers, pricingFaqs } from './pricing.js'
 import { site } from './site.js'
 import { useCases } from './usecases.js'
+import { scratchpadHub, scratchpadPages } from './scratchpad.js'
 
 // Search and social metadata for the public marketing pages. The prerender
 // build writes these into each page's <head>; the app updates them on navigation.
@@ -53,6 +54,18 @@ for (const a of assistants) {
     description: a.seoDescription,
     faqs: a.faqs,
     crumbs: [['Connect your AI', '/connect'], [a.label]],
+  }
+}
+pages['/agent-scratchpad'] = {
+  title: `${scratchpadHub.seoTitle} · Canvasbin`,
+  description: scratchpadHub.seoDescription,
+}
+for (const p of scratchpadPages) {
+  pages[`/agent-scratchpad/${p.slug}`] = {
+    title: `${p.seoTitle} · Canvasbin`,
+    description: p.seoDescription,
+    faqs: p.faqs,
+    crumbs: [['Agent scratchpad', '/agent-scratchpad'], [p.label]],
   }
 }
 

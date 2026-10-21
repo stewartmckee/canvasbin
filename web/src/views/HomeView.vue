@@ -24,6 +24,7 @@ const personalFull = computed(
   () => !space.value && (quotaHit.value || (auth.me?.quota > 0 && auth.me.page_count >= auth.me.quota)),
 )
 
+const agenticScratchpad = ref(false)
 const blank = { title: '', format: 'html', content: '' }
 
 if (!accountsEnabled.value) pruneRecent(getPage)
@@ -32,7 +33,13 @@ async function create(page) {
   saving.value = true
   error.value = ''
   try {
-    const created = await createPage(space.value ? { ...page, team_id: Number(space.value) } : page)
+    const body = { ...page }
+    if (agenticScratchpad.value) {
+      body.agentic_only = true
+    } else if (space.value) {
+      body.team_id = Number(space.value)
+    }
+    const created = await createPage(body)
     rememberPage(created)
     if (currentUser.value) loadMe()
     editor.value?.markSaved()
@@ -84,11 +91,17 @@ function formatDate(s) {
     <UpgradePrompt v-if="accountsEnabled && personalFull" from="new-page" />
     <div v-if="accountsEnabled && activeTeams.length" class="space-picker">
       <label for="space">Create in</label>
-      <select id="space" v-model="space">
+      <select id="space" v-model="space" :disabled="agenticScratchpad">
         <option value="">Personal</option>
         <option v-for="t in activeTeams" :key="t.id" :value="String(t.id)">{{ t.name }} (team)</option>
       </select>
     </div>
+    <p v-if="accountsEnabled" class="scratchpad-create muted small">
+      <label>
+        <input v-model="agenticScratchpad" type="checkbox" />
+        Agent scratchpad (hidden from your library unless you turn on “Show agent scratchpads”)
+      </label>
+    </p>
     <PageEditor ref="editor" :page="blank" mode="create" :saving="saving" @save="create" @dirty="dirty = $event" />
 
     <div v-if="!accountsEnabled" class="home-grid">

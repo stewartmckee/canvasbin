@@ -499,7 +499,8 @@ func (s *Server) library(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	pages, err := s.Store.ListOwnedAndShared(r.Context(), u.ID)
+	includeAgentic := r.URL.Query().Get("include_agentic") == "1"
+	pages, err := s.Store.ListOwnedAndShared(r.Context(), u.ID, includeAgentic)
 	if err != nil {
 		writeStoreError(w, err)
 		return

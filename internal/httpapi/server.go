@@ -130,6 +130,7 @@ var marketingPaths = []string{
 	"/use-cases", "/use-cases/developers", "/use-cases/business", "/use-cases/family",
 	"/use-cases/news-apps-games",
 	"/connect", "/connect/claude", "/connect/chatgpt", "/connect/cursor",
+	"/agent-scratchpad", "/agent-scratchpad/share-context-across-platforms", "/agent-scratchpad/backup-ai-chats",
 }
 
 func (s *Server) indexable(r *http.Request) bool {
@@ -221,10 +222,11 @@ func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
 }
 
 type pageInput struct {
-	Title   *string `json:"title"`
-	Format  *string `json:"format"`
-	Content *string `json:"content"`
-	TeamID  *int64  `json:"team_id"`
+	Title        *string `json:"title"`
+	Format       *string `json:"format"`
+	Content      *string `json:"content"`
+	TeamID       *int64  `json:"team_id"`
+	AgenticOnly  *bool   `json:"agentic_only"`
 }
 
 // publicConfig tells the web UI which optional features are available.
@@ -262,13 +264,14 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		a   *store.Access
 		err error
 	)
+	agentic := derefBool(in.AgenticOnly)
 	u := s.SessionUser(r)
-	if u != nil && in.TeamID != nil {
+	if u != nil && in.TeamID != nil && !agentic {
 		if err = s.checkTeamCreate(r, u, *in.TeamID); err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		a, err = s.Store.CreateInTeam(r.Context(), u.ID, *in.TeamID, deref(in.Title), deref(in.Format), deref(in.Content))
+		a, err = s.Store.CreateInTeam(r.Context(), u.ID, *in.TeamID, deref(in.Title), deref(in.Format), deref(in.Content), false)
 		if err == nil {
 			a, err = s.Store.GetForUser(r.Context(), a.WriteKey, u.ID)
 			s.logPage(r, u, a, store.ActivityPageCreated)
@@ -278,12 +281,12 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 			writeStoreError(w, err)
 			return
 		}
-		a, err = s.Store.CreateOwned(r.Context(), u.ID, deref(in.Title), deref(in.Format), deref(in.Content))
+		a, err = s.Store.CreateOwned(r.Context(), u.ID, deref(in.Title), deref(in.Format), deref(in.Content), agentic)
 	} else if s.accounts() {
 		writeError(w, http.StatusUnauthorized, "sign in to create pages")
 		return
 	} else {
-		a, err = s.Store.Create(r.Context(), deref(in.Title), deref(in.Format), deref(in.Content))
+		a, err = s.Store.Create(r.Context(), deref(in.Title), deref(in.Format), deref(in.Content), agentic)
 	}
 	if err != nil {
 		writeStoreError(w, err)
@@ -326,7 +329,7 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content}
+	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content, AgenticOnly: in.AgenticOnly}
 	var (
 		a   *store.Access
 		err error
@@ -693,6 +696,10 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func derefBool(b *bool) bool {
+	return b != nil && *b
 }
 
 func (s *Server) commonHeaders(next http.Handler) http.Handler {
