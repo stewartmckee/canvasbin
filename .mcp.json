@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "canvasbin": {
+      "type": "http",
+      "url": "https://canvasbin.dev/mcp"
+    }
+  }
+}

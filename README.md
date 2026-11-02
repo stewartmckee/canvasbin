@@ -323,7 +323,9 @@ To share the server with everyone who clones a repository, commit a
 ```
 
 Claude Code asks before it uses a project `.mcp.json`. `"type": "http"` is
-required. `streamable-http` is accepted as an alias.
+required. `streamable-http` is accepted as an alias. This repository commits
+that file at the root, pointed at `https://canvasbin.dev/mcp`, so
+cursor.directory can find the server.
 
 ### Other clients
 
