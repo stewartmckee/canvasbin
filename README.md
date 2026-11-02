@@ -74,10 +74,10 @@ where you run Canvasbin. On your own machine that is `http://localhost:8080`.
 
 Self-hosting is the default. Accounts stay off: there is no sign-in, and a
 page is created with its read and write links. You need Docker. Postgres
-stores the pages. The app image is published from the build on `main` as
-[`stewartmckee/canvasbin`](https://hub.docker.com/r/stewartmckee/canvasbin)
-(`linux/amd64` and `linux/arm64`). It includes the editor and headless
-Chromium for PDF export. Each push also tags the short git SHA (`sha-…`).
+stores the pages. CircleCI publishes the app image on each push to `main`
+as [`stewartmckee/canvasbin`](https://hub.docker.com/r/stewartmckee/canvasbin)
+(`linux/amd64`). It includes the editor and headless Chromium for PDF
+export. Each build also tags `0.1.<build number>`.
 
 `ACCOUNTS` defaults to `off`. Leave it that way for a private bin.
 
@@ -170,7 +170,7 @@ app. The proxy must append the caller to `X-Forwarded-For`. Canvasbin uses
 the rightmost address, and only when the TCP peer is a private or loopback
 address.
 
-Pin `sha-…` instead of `latest` when you want upgrades to be deliberate.
+Pin `0.1.<build number>` instead of `latest` when you want upgrades to be deliberate.
 
 To build the image from this checkout instead of pulling it:
 

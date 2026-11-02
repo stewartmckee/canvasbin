@@ -1,0 +1,64 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: golang:1.27
+    working_directory: ~/canvasbin
+    steps:
+      - checkout
+      - run:
+          name: Test
+          command: go test ./...
+
+  web:
+    docker:
+      - image: node:24
+    working_directory: ~/canvasbin
+    steps:
+      - checkout
+      - run:
+          name: Build UI
+          command: npm ci && npm run build
+          working_directory: ~/canvasbin/web
+
+  publish:
+    docker:
+      - image: cimg/base:stable
+    resource_class: large
+    working_directory: ~/canvasbin
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Docker login
+          command: echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+      - run:
+          name: Build and push
+          command: |
+            tag="0.1.${CIRCLE_BUILD_NUM}"
+            docker build \
+              --build-arg VERSION="${CIRCLE_SHA1}" \
+              --build-arg TARGETOS=linux \
+              --build-arg TARGETARCH=amd64 \
+              -t "stewartmckee/canvasbin:${tag}" \
+              -t stewartmckee/canvasbin:latest \
+              .
+            docker push "stewartmckee/canvasbin:${tag}"
+            docker push stewartmckee/canvasbin:latest
+
+workflows:
+  build:
+    jobs:
+      - test
+      - web
+      - publish:
+          context:
+            - stewartmckee-docker
+          requires:
+            - test
+            - web
+          filters:
+            branches:
+              only:
+                - main
