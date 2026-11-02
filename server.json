@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.stewartmckee/canvasbin",
+  "title": "Canvasbin",
+  "description": "Publish HTML and Markdown pages at shareable links.",
+  "version": "1.0.0",
+  "websiteUrl": "https://canvasbin.dev",
+  "repository": {
+    "url": "https://github.com/stewartmckee/canvasbin",
+    "source": "github",
+    "id": "1415352468"
+  },
+  "icons": [
+    {
+      "src": "https://canvasbin.dev/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://canvasbin.dev/mcp"
+    }
+  ]
+}
