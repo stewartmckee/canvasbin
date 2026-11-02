@@ -72,12 +72,20 @@ where you run Canvasbin. On your own machine that is `http://localhost:8080`.
 
 ## Run it
 
-One container, plus Postgres. The image on
-[Docker Hub](https://hub.docker.com/r/stewartmckee/canvasbin) is
-`stewartmckee/canvasbin` (`linux/amd64`). It includes the editor and
-headless Chromium for PDF export.
+Self-hosting is the default. Accounts stay off: there is no sign-in, and a
+page is created with its read and write links. You need Docker. Postgres
+stores the pages. The app image is published from the build on `main` as
+[`stewartmckee/canvasbin`](https://hub.docker.com/r/stewartmckee/canvasbin)
+(`linux/amd64` and `linux/arm64`). It includes the editor and headless
+Chromium for PDF export. Each push also tags the short git SHA (`sha-…`).
 
-Save this as `compose.yaml`:
+`ACCOUNTS` defaults to `off`. Leave it that way for a private bin.
+
+### Docker Compose
+
+This is the sample to run. The same file is
+[`examples/compose.yaml`](examples/compose.yaml). It is not
+`docker-compose.yml`, which is only for developing this repository.
 
 ```yaml
 name: canvasbin
@@ -110,6 +118,7 @@ services:
       DATABASE_URL: postgres://canvasbin:${POSTGRES_PASSWORD}@postgres:5432/canvasbin?sslmode=disable
       HTTP_ADDR: ":8080"
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      ACCOUNTS: "off"
     # Chromium's sandbox needs namespaces Docker's default seccomp profile blocks.
     # Without this, PDF export fails instead of running the browser unsandboxed.
     security_opt:
@@ -121,23 +130,56 @@ volumes:
 
 ```bash
 export POSTGRES_PASSWORD='choose-a-password'
-export PUBLIC_BASE_URL='https://canvasbin.example.com'   # optional; see below
-docker compose up -d
+docker compose -f examples/compose.yaml up -d
 ```
 
-Open <http://localhost:8080>. Put a reverse proxy with TLS in front of port
-8080 for anything other than local use, and set `PUBLIC_BASE_URL` to the
-public origin (no trailing slash). Accounts and page updates refuse to start
-unless that origin is `https://…` (or `http://localhost` for local use), so
-password-reset and verification links never follow a request `Host` header.
-When `PUBLIC_BASE_URL` is unset, ordinary page links are built from the
-request. `X-Forwarded-Proto` and `X-Forwarded-Host` are read only when the
-TCP peer is a private or loopback address.
+Open <http://localhost:8080>.
 
-Pin an image tag instead of `latest` when you want upgrades to be deliberate.
+### Docker Run
 
-Build the image yourself with `docker compose up --build` in a checkout. That
-compose file uses a local Postgres password and is meant for development.
+The same two containers without a compose file. `restart` brings the app
+back up if Postgres is not ready on the first start.
+
+```bash
+docker network create canvasbin
+docker volume create canvasbin-pg
+
+docker run -d --name canvasbin-db --network canvasbin --restart unless-stopped \
+  -e POSTGRES_USER=canvasbin \
+  -e POSTGRES_PASSWORD=choose-a-password \
+  -e POSTGRES_DB=canvasbin \
+  -v canvasbin-pg:/var/lib/postgresql/data \
+  postgres:16-alpine
+
+docker run -d --name canvasbin --network canvasbin --restart unless-stopped \
+  -p 8080:8080 \
+  -e DATABASE_URL='postgres://canvasbin:choose-a-password@canvasbin-db:5432/canvasbin?sslmode=disable' \
+  -e HTTP_ADDR=:8080 \
+  -e PUBLIC_BASE_URL=http://localhost:8080 \
+  -e ACCOUNTS=off \
+  --security-opt seccomp=unconfined \
+  stewartmckee/canvasbin:latest
+```
+
+Open <http://localhost:8080>.
+
+For anything other than local use, put a TLS reverse proxy in front and set
+`PUBLIC_BASE_URL` to that `https` origin with no trailing slash. Do not
+publish port 8080 on a public interface; only the proxy should reach the
+app. The proxy must append the caller to `X-Forwarded-For`. Canvasbin uses
+the rightmost address, and only when the TCP peer is a private or loopback
+address.
+
+Pin `sha-…` instead of `latest` when you want upgrades to be deliberate.
+
+To build the image from this checkout instead of pulling it:
+
+```bash
+docker build -t stewartmckee/canvasbin:local .
+```
+
+Use that name in the `docker run` above. `docker compose up --build` in the
+repository root is the development stack, not this sample.
 
 ## Develop from source
 
@@ -182,17 +224,11 @@ cd web && npm run build
 | `HTTP_ADDR` | `:8080` | Listen address. |
 | `PUBLIC_BASE_URL` | request host | Origin used in returned links. |
 | `CHROME_BIN` | Chrome/Chromium on `PATH` | Browser used to print PDFs. |
-| `ACCOUNTS` | off | Set to `on` for email signup, library, sharing, billing, and MCP OAuth. |
-| `MAILGUN_SENDING_KEY` | empty | Required when `ACCOUNTS=on`. Mailgun EU sending API key. |
-| `MAILGUN_DOMAIN` | `canvasbin.dev` | Mailgun sending domain. |
+| `ACCOUNTS` | off | Leave `off` for a self-hosted bin with no sign-in. `on` adds email signup and a library, and then requires `MAILGUN_SENDING_KEY` and an `https` `PUBLIC_BASE_URL` (`http://localhost` is allowed). |
+| `MAILGUN_SENDING_KEY` | empty | Required only when `ACCOUNTS=on`. Mailgun EU sending API key. |
+| `MAILGUN_DOMAIN` | `canvasbin.dev` | Mailgun sending domain. Used only when accounts are on. |
 | `MAIL_FROM` | `Canvasbin <noreply@canvasbin.dev>` | From address for verification and reset mail. |
-| `ADMIN_EMAILS` | empty | Comma-separated emails allowed to use the admin user list. |
-| `STRIPE_SECRET_KEY` | empty | Stripe secret key for Checkout and the Customer Portal. |
-| `STRIPE_WEBHOOK_SECRET` | empty | Signing secret for `POST /api/stripe/webhook`. |
-| `STRIPE_PRICE_PRO` | empty | Recurring Price id for the Individual (internally "pro") plan. |
-| `STRIPE_PRICE_TEAM_BASE` | empty | Recurring flat monthly Price id for a team (£15). |
-| `STRIPE_PRICE_TEAM_SEAT` | empty | Recurring per-member monthly Price id for a team (£4); quantity tracks the member count. |
-| `STRIPE_PUBLISHABLE_KEY` | empty | Optional publishable key for the UI. |
+| `ADMIN_EMAILS` | empty | Comma-separated emails allowed to use the admin user list. Accounts only. |
 
 Copy [`.env.example`](.env.example) for a local env file. Never commit real secrets.
 
@@ -210,11 +246,11 @@ With `ACCOUNTS=off` (the default), Canvasbin stays authless: create a page, shar
 the read link, keep the write link.
 
 With `ACCOUNTS=on`, people can register with email and password. Mailgun sends
-the verification link. Signed-in users get a library, can claim a write-key page,
-invite collaborators, and (when Stripe is configured) upgrade to Pro via Checkout
-and manage billing in the Stripe Customer Portal. Free accounts may own 5 pages;
-Pro may own 100. Creating a page requires signing in; existing pages keep
-working by their read and write links without an account.
+the verification link, so `MAILGUN_SENDING_KEY` and `PUBLIC_BASE_URL` are
+required. Signed-in users get a library and can claim a write-key page.
+Creating a page then requires signing in; existing pages keep working by
+their read and write links without an account. The Docker samples leave
+accounts off.
 
 ## Connect an agent
 
@@ -342,7 +378,7 @@ url = "https://{your-canvas-bin-host}/mcp"
 - `get_page` — read a page by read key, write key, or URL.
 - `update_page` — replace content, title, or format. Needs the write key. Omitted fields stay as they are. `content` replaces the whole page.
 - `delete_page` — delete a page. Needs the write key.
-- `get_style_guide` / `set_style_guide` — read, create, or update a team's style guide (accounts on, Team plan only). Any member of an active team can create the guide or replace it later. `create_page` tells the agent to call `get_style_guide` before writing a team page.
+- `get_style_guide` / `set_style_guide` — read, create, or update a team's style guide. These are registered only when accounts are on. Any member of that team can create the guide or replace it later. `create_page` tells the agent to call `get_style_guide` before writing a team page.
 
 Tools that take a key accept the bare key or any Canvasbin URL. HTML may be a
 fragment or a full document. Scripts in the rendered page run in a sandbox.

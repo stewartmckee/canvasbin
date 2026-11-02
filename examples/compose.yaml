@@ -1,0 +1,47 @@
+# Self-hosted Canvasbin. Accounts are off.
+#
+#   export POSTGRES_PASSWORD='choose-a-password'
+#   docker compose -f examples/compose.yaml up -d
+#
+# Open http://localhost:8080
+# For a public host, set PUBLIC_BASE_URL to the https origin (no trailing slash)
+# and terminate TLS on a reverse proxy. Do not publish port 8080 to the internet.
+
+name: canvasbin
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: canvasbin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: canvasbin
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canvasbin -d canvasbin"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  canvasbin:
+    image: stewartmckee/canvasbin:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://canvasbin:${POSTGRES_PASSWORD}@postgres:5432/canvasbin?sslmode=disable
+      HTTP_ADDR: ":8080"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      ACCOUNTS: "off"
+    # Chromium's sandbox needs namespaces Docker's default seccomp profile blocks.
+    # Without this, PDF export fails instead of running the browser unsandboxed.
+    security_opt:
+      - seccomp:unconfined
+
+volumes:
+  pgdata: {}
