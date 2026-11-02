@@ -145,6 +145,13 @@ func (s *Store) GetOAuthTokenByRefresh(ctx context.Context, refreshHash []byte) 
 		   AND (refresh_expires_at IS NULL OR refresh_expires_at > now())`, refreshHash))
 }
 
+// FindOAuthTokenByRefresh returns the refresh-token row even when it has been
+// revoked or has expired. Callers use it to spot reuse of a rotated token.
+func (s *Store) FindOAuthTokenByRefresh(ctx context.Context, refreshHash []byte) (*OAuthToken, error) {
+	return scanOAuthToken(s.db.QueryRow(ctx,
+		`SELECT `+oauthTokenColumns+` FROM oauth_tokens WHERE refresh_hash = $1`, refreshHash))
+}
+
 // RevokeOAuthToken revokes one token pair by id. Revoking twice is harmless.
 func (s *Store) RevokeOAuthToken(ctx context.Context, id int64) error {
 	_, err := s.db.Exec(ctx, `UPDATE oauth_tokens SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1`, id)

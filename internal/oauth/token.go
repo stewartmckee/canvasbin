@@ -110,6 +110,20 @@ func (p *Provider) codeGrant(w http.ResponseWriter, r *http.Request, f form) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// revokeReusedRefresh drops every live token for the user and client when a
+// refresh token that was already rotated is presented again. A stolen token
+// that was used first then loses the replacement; an unknown or merely expired
+// token does not match a revoked row, so it changes nothing.
+func (p *Provider) revokeReusedRefresh(ctx context.Context, clientID string, refreshHash []byte) {
+	old, err := p.Store.FindOAuthTokenByRefresh(ctx, refreshHash)
+	if err != nil || old.RevokedAt == nil || old.ClientID != clientID {
+		return
+	}
+	if _, err := p.Store.RevokeClientTokens(ctx, old.UserID, old.ClientID); err != nil {
+		slog.Error("oauth refresh reuse revoke", "err", err)
+	}
+}
+
 // clientLabel names an OAuth client for analytics: the host of a URL client id
 // (CIMD), otherwise the registered client name.
 func (p *Provider) clientLabel(ctx context.Context, clientID string) string {
@@ -133,8 +147,10 @@ func (p *Provider) refreshGrant(w http.ResponseWriter, r *http.Request, f form) 
 		oauthError(w, http.StatusBadRequest, "invalid_request", "refresh_token and client_id are required")
 		return
 	}
-	old, err := p.Store.GetOAuthTokenByRefresh(r.Context(), auth.HashToken(refresh))
+	refreshHash := auth.HashToken(refresh)
+	old, err := p.Store.GetOAuthTokenByRefresh(r.Context(), refreshHash)
 	if errors.Is(err, store.ErrInvalidToken) {
+		p.revokeReusedRefresh(r.Context(), clientID, refreshHash)
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "refresh token is invalid, expired or revoked")
 		return
 	}

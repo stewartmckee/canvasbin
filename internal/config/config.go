@@ -5,6 +5,8 @@ package config
 import (
 	"context"
 	"errors"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 
@@ -113,6 +115,22 @@ func fromGetenv(get func(string) string) Config {
 	return c
 }
 
+// publicBaseOK accepts the origin used in emailed links. Request headers must
+// not be able to choose that origin, so accounts and updates refuse to start
+// without it. Local http is limited to loopback hosts.
+func publicBaseOK(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
+		return false
+	}
+	host := u.Hostname()
+	if u.Scheme == "https" {
+		return host != ""
+	}
+	ip := net.ParseIP(host)
+	return host == "localhost" || (ip != nil && ip.IsLoopback())
+}
+
 func truthy(v string) bool {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "on", "true", "1", "yes":
@@ -128,6 +146,9 @@ func (c Config) Validate() error {
 	}
 	if c.Updates && c.MailgunKey == "" {
 		return errors.New("UPDATES is on but MAILGUN_SENDING_KEY is not set")
+	}
+	if (c.Accounts || c.Updates) && !publicBaseOK(c.PublicBaseURL) {
+		return errors.New("ACCOUNTS or UPDATES requires PUBLIC_BASE_URL to be an https origin (http://localhost is allowed)")
 	}
 	if c.UpdatesMode != "" && c.UpdatesMode != UpdatesModeFeed && c.UpdatesMode != UpdatesModeNotifyOnEdit {
 		return errors.New("UPDATES_MODE must be feed or notify_on_page_edit")

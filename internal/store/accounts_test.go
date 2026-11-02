@@ -317,6 +317,19 @@ func TestOAuthStore(t *testing.T) {
 	if _, err := st.GetOAuthTokenByAccess(ctx, acc); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("rotated token still valid: %v", err)
 	}
+	reused, err := st.FindOAuthTokenByRefresh(ctx, ref)
+	if err != nil || reused.RevokedAt == nil || reused.UserID != u.ID {
+		t.Fatalf("rotated refresh row: %+v %v", reused, err)
+	}
+	if _, err := st.GetOAuthTokenByRefresh(ctx, ref2); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.RevokeClientTokens(ctx, u.ID, cid); err != nil || n != 1 {
+		t.Fatalf("reuse revoke: %d %v", n, err)
+	}
+	if _, err := st.GetOAuthTokenByRefresh(ctx, ref2); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("replacement refresh still live after reuse revoke: %v", err)
+	}
 	if err := st.RevokeOAuthTokenByHash(ctx, ref2); err != nil {
 		t.Fatal(err)
 	}

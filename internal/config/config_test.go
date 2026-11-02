@@ -39,6 +39,25 @@ func TestLoadAccounts(t *testing.T) {
 	}
 }
 
+func TestPublicBaseRequiredForMail(t *testing.T) {
+	base := map[string]string{"ACCOUNTS": "on", "MAILGUN_SENDING_KEY": "k"}
+	if err := fromGetenv(env(base)).Validate(); err == nil {
+		t.Fatal("accounts without PUBLIC_BASE_URL should fail")
+	}
+	base["PUBLIC_BASE_URL"] = "http://evil.example"
+	if err := fromGetenv(env(base)).Validate(); err == nil {
+		t.Fatal("http public origin should fail")
+	}
+	base["PUBLIC_BASE_URL"] = "https://canvasbin.dev"
+	if err := fromGetenv(env(base)).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	base["PUBLIC_BASE_URL"] = "http://localhost:8080"
+	if err := fromGetenv(env(base)).Validate(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateUpdatesNeedsMail(t *testing.T) {
 	c := fromGetenv(env(map[string]string{"UPDATES": "on"}))
 	if err := c.Validate(); err == nil {

@@ -127,8 +127,12 @@ docker compose up -d
 
 Open <http://localhost:8080>. Put a reverse proxy with TLS in front of port
 8080 for anything other than local use, and set `PUBLIC_BASE_URL` to the
-public origin (no trailing slash). When `PUBLIC_BASE_URL` is unset, links are
-built from the request, including `X-Forwarded-Proto` and `X-Forwarded-Host`.
+public origin (no trailing slash). Accounts and page updates refuse to start
+unless that origin is `https://…` (or `http://localhost` for local use), so
+password-reset and verification links never follow a request `Host` header.
+When `PUBLIC_BASE_URL` is unset, ordinary page links are built from the
+request. `X-Forwarded-Proto` and `X-Forwarded-Host` are read only when the
+TCP peer is a private or loopback address.
 
 Pin an image tag instead of `latest` when you want upgrades to be deliberate.
 
@@ -193,8 +197,12 @@ cd web && npm run build
 Copy [`.env.example`](.env.example) for a local env file. Never commit real secrets.
 
 Page content is limited to 1 MiB. Creating pages is rate limited (60 per 10
-minutes per client IP). PDF renders are limited too. Behind a proxy, set
-`X-Forwarded-For` so limits apply to the caller rather than the proxy.
+minutes per client IP). PDF renders are limited too. Behind a proxy, append
+the caller to `X-Forwarded-For` (`$proxy_add_x_forwarded_for`). Canvasbin
+uses the rightmost address in that header, and only when the connection
+comes from a private or loopback address, so a client cannot choose a fresh
+rate-limit bucket by sending its own value. Do not publish the app port on
+a public interface; the proxy should be the only thing that can reach it.
 
 ### Accounts (optional)
 
@@ -230,12 +238,13 @@ retries with a bearer token. Discovery documents live at
 
 ### Cursor plugin
 
-This repository is also a Cursor plugin (`.cursor-plugin/plugin.json`). It
-connects Cursor to `https://canvasbin.dev/mcp` and adds a `canvasbin` skill
-that tells the agent when to publish a page and which link to hand back.
-Install it from the Cursor Marketplace, then ask the agent to publish
-something; Cursor opens the Canvasbin sign-in the first time. To use your own
-host instead, configure the server by hand as shown under Other clients.
+This repository is also a Cursor plugin (`.cursor-plugin/plugin.json`). The
+Marketplace install always connects Cursor to `https://canvasbin.dev/mcp`
+and adds a `canvasbin` skill that tells the agent when to publish a page and
+which link to hand back. Sign-in is OAuth on that host: Cursor opens the
+Canvasbin consent screen the first time, and the plugin never sees the
+account password. To use your own host instead, configure the server by hand
+as shown under Other clients.
 
 ### Claude Code
 

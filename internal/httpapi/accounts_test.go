@@ -386,7 +386,7 @@ func TestAdminDisable(t *testing.T) {
 	admin.want(409, "POST", "/api/admin/users/"+fmt.Sprint(int64(aid))+"/disable", nil)
 	admin.want(200, "POST", fmt.Sprintf("/api/admin/users/%d/disable", int64(vid)), nil)
 	victim.want(401, "GET", "/api/me", nil)
-	victim.want(403, "POST", "/api/login", map[string]string{"email": victimEmail, "password": "password123"})
+	victim.want(401, "POST", "/api/login", map[string]string{"email": victimEmail, "password": "password123"})
 	admin.want(200, "POST", fmt.Sprintf("/api/admin/users/%d/disable", int64(vid)), map[string]bool{"disabled": false})
 	victim.want(200, "POST", "/api/login", map[string]string{"email": victimEmail, "password": "password123"})
 }

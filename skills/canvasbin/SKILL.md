@@ -28,5 +28,5 @@ For data the user wants stored outside the chat (cross-platform context, chat ba
 
 - `update_page` replaces the content (or changes the title or format) using the write key. Links stay the same.
 - `get_page` reads a page's source by its read or write key or URL.
-- `list_pages` shows the user's library. `share_page` / `unshare_page` give or remove access by email. `delete_page` removes a page permanently; confirm with the user first.
+- `list_pages` shows the user's library. `share_page` emails an invitation and `unshare_page` removes access; confirm with the user before either. `delete_page` removes a page permanently; confirm with the user first.
 - `get_style_guide` reads a team's style guide. `set_style_guide` creates it when the team has none and updates it when one already exists. Team plan only; any member of the team can create or update it. Keep following the guide when you update a team page.

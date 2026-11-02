@@ -228,12 +228,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	if !auth.CheckPassword(u.PasswordHash, in.Password) {
+	if !auth.CheckPassword(u.PasswordHash, in.Password) || u.Disabled() {
 		writeError(w, http.StatusUnauthorized, "invalid email or password")
-		return
-	}
-	if u.Disabled() {
-		writeStoreError(w, store.ErrDisabled)
 		return
 	}
 	if err := s.startSession(w, r, u); err != nil {
