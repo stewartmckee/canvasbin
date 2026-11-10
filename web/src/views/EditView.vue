@@ -6,7 +6,7 @@ import SharePanel from '../components/SharePanel.vue'
 import TeamPagePanel from '../components/TeamPagePanel.vue'
 import UpdatesPanel from '../components/UpdatesPanel.vue'
 import UpgradePrompt from '../components/UpgradePrompt.vue'
-import { claimPage, deletePage, getPage, updatePage } from '../api.js'
+import { claimPage, deletePage, getPage, savePage } from '../api.js'
 import { accountsEnabled, currentUser, loadMe } from '../auth.js'
 import { forgetPage, rememberPage } from '../recent.js'
 import { useLeaveGuard } from '../composables/useLeaveGuard.js'
@@ -117,7 +117,7 @@ async function save(changes) {
   saving.value = true
   saveError.value = ''
   try {
-    const p = await updatePage(props.pageKey, changes)
+    const p = await savePage(props.pageKey, changes)
     editor.value?.markSaved(changes)
     page.value = p
     status.value = savedStatus(p)

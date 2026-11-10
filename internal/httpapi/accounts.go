@@ -130,14 +130,10 @@ func (s *Server) allowMail(w http.ResponseWriter, email string) bool {
 // sendVerification issues a fresh verification token and emails it. Failures are
 // logged (never including secrets) and returned.
 func (s *Server) sendVerification(r *http.Request, u *store.User) error {
-	token, err := auth.NewToken()
+	link, err := s.issueVerifyLink(r.Context(), u.ID, s.baseURL(r))
 	if err != nil {
 		return err
 	}
-	if err := s.Store.CreateEmailToken(r.Context(), u.ID, store.PurposeVerify, auth.HashToken(token), time.Now().Add(verifyTokenTTL)); err != nil {
-		return err
-	}
-	link := s.baseURL(r) + "/verify?token=" + token
 	return s.Mailer.SendVerify(r.Context(), u.Email, link)
 }
 
@@ -707,7 +703,11 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Switching between paid plans updates the existing subscription.
-		if err := s.Billing.ChangePlan(r.Context(), u, plan); err != nil {
+		reg := s.billingRegion(r)
+		if u.StripePriceID != nil && *u.StripePriceID != "" {
+			reg = s.Config.RegionForPriceID(*u.StripePriceID)
+		}
+		if err := s.Billing.ChangePlan(r.Context(), u, plan, reg); err != nil {
 			writeBillingError(w, err)
 			return
 		}
@@ -715,7 +715,8 @@ func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := s.baseURL(r)
-	url, err := s.Billing.CreateCheckoutSession(r.Context(), u, plan, base+"/?billing=success", base+"/?billing=cancelled")
+	reg := s.billingRegion(r)
+	url, err := s.Billing.CreateCheckoutSession(r.Context(), u, plan, reg, base+"/?billing=success", base+"/?billing=cancelled")
 	if err != nil {
 		writeBillingError(w, err)
 		return

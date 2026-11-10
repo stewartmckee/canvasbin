@@ -1,7 +1,7 @@
 // Writes dist/prerender/<path>.html for each marketing page: the signed-out
 // app HTML plus per-page title, description, social tags and structured data.
 // The Go server serves these to signed-out visitors and crawlers.
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -29,4 +29,5 @@ for (const path of marketingPaths) {
   await writeFile(file, page)
   console.log('prerendered', path)
 }
+await copyFile(join(root, 'marketing-paths.json'), join(dist, 'marketing-paths.json'))
 await rm(ssrDir, { recursive: true, force: true })

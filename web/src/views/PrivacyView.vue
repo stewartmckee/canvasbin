@@ -37,7 +37,7 @@ import { site } from '../site.js'
 
     <h2>AI assistants (MCP)</h2>
     <p>
-      When you connect Claude, ChatGPT, Cursor or another assistant to {{ site.name }}, it can only use the tools you
+      When you connect an AI assistant to {{ site.name }}, it can only use the tools you
       approve during sign-in, and only on pages you own, pages shared with you, your teams’ pages, and a team’s style
       guide when the Team plan is active. We receive just
       what the assistant sends in each tool call, such as a page’s title and content, a style guide, or an email address you ask it to

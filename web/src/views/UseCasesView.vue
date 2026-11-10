@@ -22,6 +22,26 @@ const highlights = useCases.map((u) => ({ ...u.samples[0], slug: u.slug, label: 
       </div>
     </section>
 
+    <section class="section band">
+      <h2 class="section-title">Context and chat backup</h2>
+      <p class="lead center">
+        Not every page is for an audience. Agent scratchpads let you back up agent context and share the same project
+        notes with every assistant you connect over MCP.
+      </p>
+      <div class="usecase-cards">
+        <RouterLink to="/agent-scratchpad/backup-ai-chats" class="usecase-card">
+          <strong>Backup AI chats</strong>
+          <span class="muted">Durable copies of decisions and todos outside any single chat provider.</span>
+          <span class="usecase-more">How chat backup works →</span>
+        </RouterLink>
+        <RouterLink to="/agent-scratchpad/share-context-across-platforms" class="usecase-card">
+          <strong>Share context across platforms</strong>
+          <span class="muted">One living context page every connected assistant can read and update.</span>
+          <span class="usecase-more">Cross-platform context →</span>
+        </RouterLink>
+      </div>
+    </section>
+
     <section class="section">
       <div class="usecase-cards">
         <RouterLink v-for="u in useCases" :key="u.slug" :to="`/use-cases/${u.slug}`" class="usecase-card">

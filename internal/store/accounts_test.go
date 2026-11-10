@@ -192,7 +192,8 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 	if got, _ = st.GetForUser(ctx, a.ReadKey, other.ID); !got.CanWrite || got.Role != RoleEditor {
 		t.Fatalf("editor: %+v", got)
 	}
-	if out, err := st.UpdateForUser(ctx, a.ReadKey, other.ID, Changes{Content: ptr("edited")}); err != nil || out.Content != "edited" {
+	edited := "edited"
+	if out, err := st.UpdateForUser(ctx, a.ReadKey, other.ID, Changes{Content: &edited, ExpectedBytes: ptr(len(edited))}); err != nil || out.Content != edited {
 		t.Fatalf("editor update: %+v %v", out, err)
 	}
 	if _, err := st.DeleteForUser(ctx, a.ReadKey, other.ID); !errors.Is(err, ErrReadOnly) {

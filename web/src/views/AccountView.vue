@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import McpConnect from '../components/McpConnect.vue'
 import { listConnections, openBillingPortal, revokeConnection, startCheckout } from '../api.js'
-import { auth, currentUser, isAdmin, loadMe, logout, myTeams } from '../auth.js'
+import { auth, currentUser, isAdmin, loadMe, logout, myTeams, safeNext } from '../auth.js'
 import { track } from '../analytics.js'
 import { isPaidPlan, planName, site } from '../site.js'
 
@@ -19,6 +19,7 @@ const isPaid = computed(() => isPaidPlan(plan.value))
 const quotaText = computed(() => {
   const m = me.value
   if (!m) return ''
+  if (auth.signalProduct) return m.page_count ? 'Your site is live' : 'Create your site'
   return m.quota > 0 ? `${m.page_count} of ${m.quota} pages` : `${m.page_count} pages`
 })
 const periodEnd = computed(() => {
@@ -76,12 +77,21 @@ async function disconnect(app) {
 
 const fmtDate = (d) => new Date(d).toLocaleDateString()
 
-onMounted(loadApps)
+onMounted(() => {
+  loadApps()
+  const next = safeNext(route.query.next)
+  if (currentUser.value?.email_verified_at && next.startsWith('/oauth/')) {
+    window.location.assign(next)
+  }
+})
 </script>
 
 <template>
   <div class="account">
     <h1>Account</h1>
+    <p v-if="route.query.connect === 'verify' && !currentUser.email_verified_at" class="notice">
+      Verify your email before connecting an assistant. Use <strong>Resend email</strong> in the banner above, then return to your assistant and try again.
+    </p>
     <p v-if="route.query.billing === 'success'" class="notice">Thanks! Your plan will update in a moment.</p>
     <p v-if="route.query.upgrade === 'failed'" class="notice error">
       Your account is ready, but checkout couldn't be opened. Use Upgrade to Individual below to try again.
@@ -129,29 +139,25 @@ onMounted(loadApps)
             :disabled="busy"
             @click="go(() => startCheckout('pro'))"
           >
-            {{ isPaid ? 'Switch to Individual' : 'Upgrade to Individual' }}
-          </button>
-          <button
-            v-if="site.showSignal && plan !== 'signal' && auth.signalBillingEnabled"
-            type="button"
-            class="btn"
-            :disabled="busy"
-            @click="go(() => startCheckout('signal'))"
-          >
-            {{ isPaid ? 'Switch to Signal' : 'Upgrade to Signal' }}
+            {{
+              auth.signalProduct
+                ? isPaid
+                  ? 'Manage subscription'
+                  : `Upgrade to ${site.name}`
+                : isPaid
+                  ? 'Switch to Individual'
+                  : 'Upgrade to Individual'
+            }}
           </button>
           <button v-if="isPaid" type="button" class="btn" :disabled="busy" @click="go(openBillingPortal)">
             Manage billing
           </button>
         </div>
         <p v-if="!auth.billingEnabled" class="muted small">Billing is not enabled on this server.</p>
-        <p v-else-if="site.showSignal && auth.signalBillingEnabled && plan !== 'signal'" class="muted small">
-          Signal adds page updates that readers can subscribe to by email.
-        </p>
       </section>
     </div>
 
-    <section class="panel mt">
+    <section v-if="!auth.signalProduct" class="panel mt">
       <div class="team-section-head">
         <h2>Teams</h2>
         <RouterLink to="/teams/new" class="btn small">Start a team</RouterLink>

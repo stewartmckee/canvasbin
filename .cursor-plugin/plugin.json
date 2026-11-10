@@ -1,7 +1,7 @@
 {
   "name": "canvasbin",
   "version": "1.0.0",
-  "description": "Publish HTML and Markdown pages from your agent to Canvasbin and get back shareable links, a PDF, and an editor. Sign in once with your Canvasbin account.",
+  "description": "Publish HTML and Markdown pages from your agent to Canvasbin and get back shareable links, a PDF, and an editor. Share context and data between agents, and build dashboards that stay at the same link. Sign in once with your Canvasbin account.",
   "author": {
     "name": "Stewart McKee",
     "email": "support@canvasbin.dev"

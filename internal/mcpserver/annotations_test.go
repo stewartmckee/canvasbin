@@ -35,10 +35,11 @@ func TestToolAnnotations(t *testing.T) {
 		"get_page": true, "list_pages": true, "list_teams": true, "list_comments": true, "get_style_guide": true,
 	}
 	destructive := map[string]bool{
-		"update_page": true, "delete_page": true, "share_page": true, "unshare_page": true, "set_style_guide": true,
+		"publish_draft": true, "delete_page": true, "share_page": true, "unshare_page": true, "set_style_guide": true,
 	}
-	if len(res.Tools) != 13 {
-		t.Errorf("got %d tools, want 13", len(res.Tools))
+	openWorld := map[string]bool{"create_page": true, "publish_draft": true, "share_page": true}
+	if len(res.Tools) != 14 {
+		t.Errorf("got %d tools, want 15", len(res.Tools))
 	}
 	for _, tool := range res.Tools {
 		a := tool.Annotations
@@ -52,11 +53,14 @@ func TestToolAnnotations(t *testing.T) {
 		if *a.DestructiveHint != destructive[tool.Name] {
 			t.Errorf("%s: destructiveHint = %v", tool.Name, *a.DestructiveHint)
 		}
-		if *a.OpenWorldHint != (tool.Name == "share_page") {
+		if *a.OpenWorldHint != openWorld[tool.Name] {
 			t.Errorf("%s: openWorldHint = %v", tool.Name, *a.OpenWorldHint)
 		}
 		if tool.Name == "create_page" && !strings.Contains(tool.Description, "get_style_guide") {
 			t.Errorf("create_page should tell the agent to read the style guide: %s", tool.Description)
+		}
+		if tool.Name == "update_page" {
+			t.Errorf("update_page should not be listed")
 		}
 		if tool.Name == "get_style_guide" && !strings.Contains(tool.Description, "Team plan") {
 			t.Errorf("get_style_guide should name the Team plan: %s", tool.Description)

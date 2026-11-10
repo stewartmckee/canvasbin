@@ -33,6 +33,28 @@ func TestSendVerify(t *testing.T) {
 	}
 }
 
+func TestSendVerifyNudge(t *testing.T) {
+	var subject, html string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		subject = r.PostForm.Get("subject")
+		html = r.PostForm.Get("html")
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+	c := New("test-key", "example.dev", "Canvasbin <noreply@example.dev>")
+	c.BaseURL = srv.URL
+	if err := c.SendVerifyNudge(context.Background(), "a@b.com", "https://canvasbin.test/verify?token=abc", "https://canvasbin.test"); err != nil {
+		t.Fatal(err)
+	}
+	if subject != "Confirm your email to publish with Canvasbin" {
+		t.Fatalf("subject %q", subject)
+	}
+	if !strings.Contains(html, "use-cases/news-apps-games") {
+		t.Error("missing use case link in html")
+	}
+}
+
 func TestSendWelcome(t *testing.T) {
 	var text, subject, html string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,8 +70,8 @@ func TestSendWelcome(t *testing.T) {
 	if subject == "" || !strings.Contains(text, "https://canvasbin.test/connect") || !strings.Contains(text, "https://canvasbin.test/new") {
 		t.Fatalf("subject %q text %q", subject, text)
 	}
-	if !strings.Contains(html, `href="https://canvasbin.test/connect"`) || !strings.Contains(html, "tic tac toe") ||
-		!strings.Contains(html, "this week&#39;s sales") {
+	if !strings.Contains(html, `href="https://canvasbin.test/connect?utm_campaign=welcome`) || !strings.Contains(html, "tic tac toe") ||
+		!strings.Contains(html, "newspaper-style") {
 		t.Fatalf("html %q", html)
 	}
 }

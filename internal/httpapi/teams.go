@@ -134,6 +134,10 @@ func (s *Server) createTeam(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if s.Config.SignalProduct() {
+		writeError(w, http.StatusForbidden, "teams are not available on this product")
+		return
+	}
 	if !u.Verified() {
 		writeStoreError(w, store.ErrUnverified)
 		return
@@ -490,7 +494,8 @@ func (s *Server) teamCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	back := s.baseURL(r) + "/teams/" + strconv.FormatInt(t.ID, 10)
-	url, err := s.Billing.CreateTeamCheckoutSession(r.Context(), t, u, t.MemberCount, back+"?billing=success", back+"?billing=cancelled")
+	reg := s.billingRegion(r)
+	url, err := s.Billing.CreateTeamCheckoutSession(r.Context(), t, u, t.MemberCount, reg, back+"?billing=success", back+"?billing=cancelled")
 	if err != nil {
 		writeBillingError(w, err)
 		return

@@ -44,6 +44,19 @@ const crumbs = computed(() => [
       </div>
     </section>
 
+    <section v-if="!a" class="section band">
+      <h2 class="section-title">Back up agent context. Share it everywhere.</h2>
+      <p class="muted center">
+        Agent scratchpads are agentic-only pages your agent reads and writes over MCP — ideal for chat backups and one
+        context sheet that works across every client you connect.
+      </p>
+      <p class="related-links center">
+        <RouterLink to="/agent-scratchpad/backup-ai-chats">Backup AI chats</RouterLink>
+        <RouterLink to="/agent-scratchpad/share-context-across-platforms">Share context across platforms</RouterLink>
+        <RouterLink to="/agent-scratchpad">All scratchpad guides</RouterLink>
+      </p>
+    </section>
+
     <section id="setup" class="section">
       <h2 class="section-title left">{{ a ? `Add Canvasbin to ${a.label}` : 'Setup for every client' }}</h2>
       <McpConnect :only="a ? a.tabs : []" />

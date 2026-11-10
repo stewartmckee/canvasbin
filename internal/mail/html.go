@@ -27,7 +27,28 @@ type emailButton struct {
 	URL   string
 }
 
-var emailTmpl = template.Must(template.New("email").Parse(`<!doctype html>
+const secondaryButtonsPerRow = 3
+
+func secondaryButtonRows(btns []emailButton, perRow int) [][]emailButton {
+	if len(btns) == 0 || perRow <= 0 {
+		return nil
+	}
+	var rows [][]emailButton
+	for i := 0; i < len(btns); i += perRow {
+		row := make([]emailButton, perRow)
+		for j := 0; j < perRow; j++ {
+			if i+j < len(btns) {
+				row[j] = btns[i+j]
+			}
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+var emailTmpl = template.Must(template.New("email").Funcs(template.FuncMap{
+	"chunkButtons": secondaryButtonRows,
+}).Parse(`<!doctype html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8">
@@ -59,12 +80,27 @@ var emailTmpl = template.Must(template.New("email").Parse(`<!doctype html>
 </tr></table>
 </td></tr></table>
 {{end}}{{end}}{{range .After}}<p style="margin:16px 0 0 0;font-size:16px;line-height:24px;color:#374151;">{{.}}</p>
-{{end}}{{if .Secondary}}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0 0;">
-<tr>{{range .Secondary}}<td style="padding:0 8px 8px 0;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#ffffff" style="border-radius:8px;border:1px solid #c7d2fe;">
-<a href="{{.URL}}" target="_blank" style="display:inline-block;padding:10px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;line-height:18px;color:#4f46e5;text-decoration:none;">{{.Label}}</a>
+{{end}}{{if .Secondary}}
+<!--[if mso]>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0 0;table-layout:fixed;">
+{{range $row := chunkButtons .Secondary 3}}<tr>
+{{range $row}}<td width="178" valign="top" align="center" style="width:33.33%;padding:6px 4px;">{{if .Label}}{{template "secondaryBtn" .}}{{end}}</td>
+{{end}}</tr>
+{{end}}
+</table>
+<![endif]-->
+<!--[if !mso]><!-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 0 0;width:100%;max-width:100%;">
+<tr><td align="center" style="padding:0;">
+<div style="width:100%;max-width:536px;margin:0 auto;">
+{{range $row := chunkButtons .Secondary 3}}<div style="display:block;width:100%;text-align:center;font-size:0;line-height:0;margin:0 0 6px 0;">
+{{range $row}}{{if .Label}}<div style="display:inline-block;width:32%;max-width:32%;vertical-align:top;padding:4px 2px;font-size:13px;line-height:17px;box-sizing:border-box;">
+{{template "secondaryBtn" .}}
+</div>{{end}}{{end}}
+</div>{{end}}
+</div>
 </td></tr></table>
-</td>{{end}}</tr></table>
+<!--<![endif]-->
 {{end}}</td></tr>
 <tr><td style="padding:20px 8px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#6b7280;">{{.Footer}}{{with .FooterLink}} <a href="{{.URL}}" style="color:#4f46e5;text-decoration:underline;">{{.Label}}</a>{{end}}</td></tr>
 </table>
@@ -72,6 +108,11 @@ var emailTmpl = template.Must(template.New("email").Parse(`<!doctype html>
 </table>
 </body>
 </html>
+{{define "secondaryBtn"}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" bgcolor="#ffffff" style="border-radius:8px;border:1px solid #c7d2fe;background-color:#ffffff;">
+<a href="{{.URL}}" target="_blank" style="display:block;padding:10px 6px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;line-height:17px;color:#4f46e5;text-decoration:none;text-align:center;word-wrap:break-word;overflow-wrap:break-word;">{{.Label}}</a>
+</td></tr></table>
+{{end}}
 `))
 
 func (e htmlEmail) render() (string, error) {

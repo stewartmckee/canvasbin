@@ -46,7 +46,7 @@ without minting a new link.
 
 Agents can create **agentic-only** pages: external scratchpads for context shared
 across MCP clients or backups of what matters from a chat. Set `agentic_only:
-true` on `create_page` or `update_page`. They stay out of the web library unless
+true` on `create_page` or a draft. They stay out of the web library unless
 the user turns on “Show agent scratchpads”; `list_pages` always includes them
 with the flag set. Passing `team` with `agentic_only: true` stores a personal
 page, not a team page. See
@@ -305,7 +305,7 @@ publish a page. A typical request:
 
 `create_page` returns four links, plus the keys. `html_url` is the one to
 share. `write_url` and `write_key` come back to Claude and remain in the
-chat history, which is what lets a later turn call `update_page` without
+chat history, which is what lets a later turn call `create_draft` and `publish_draft` without
 opening the browser.
 
 To share the server with everyone who clones a repository, commit a
@@ -378,7 +378,8 @@ url = "https://{your-canvas-bin-host}/mcp"
 
 - `create_page` — publish HTML or Markdown. Returns `html_url`, `pdf_url`, `read_url`, `write_url`, and the keys. When publishing into a team, the agent is asked to read that team's style guide first.
 - `get_page` — read a page by read key, write key, or URL.
-- `update_page` — replace content, title, or format. Needs the write key. Omitted fields stay as they are. `content` replaces the whole page.
+- `create_draft` — store one unpublished draft (content, and title or format when those change). Needs the write key. Does not change the live page.
+- `publish_draft` — copy that draft onto the live page when `expected_bytes` matches the stored draft. A draft under half the live page also needs `confirm_shrink`.
 - `delete_page` — delete a page. Needs the write key.
 - `get_style_guide` / `set_style_guide` — read, create, or update a team's style guide. These are registered only when accounts are on. Any member of that team can create the guide or replace it later. `create_page` tells the agent to call `get_style_guide` before writing a team page.
 

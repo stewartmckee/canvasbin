@@ -15,8 +15,10 @@ func (c *Client) SendUpdateSubscribeConfirm(ctx context.Context, email, link, pa
 	if page == "" {
 		page = "this page"
 	}
+	confirm := withEmailUTM(link, campaignUpdatesSubscribe, "confirm")
+	base := linkBase(link)
 	text := fmt.Sprintf("Confirm your subscription to updates for %s on %s:\n\n%s\n\nIf you did not request this, ignore this email.\n",
-		page, product, link)
+		page, product, confirm)
 	html, err := htmlEmail{
 		Preheader: "Confirm your email to receive page updates.",
 		Heading:   "Confirm your subscription",
@@ -24,9 +26,9 @@ func (c *Client) SendUpdateSubscribeConfirm(ctx context.Context, email, link, pa
 			fmt.Sprintf("You asked to receive email updates for %s on %s.", page, product),
 			"Confirm your email address to start receiving new posts.",
 		},
-		Button: &emailButton{Label: "Confirm subscription", URL: link},
+		Button: &emailButton{Label: "Confirm subscription", URL: confirm},
 		Footer: fmt.Sprintf("You're receiving this because someone entered this address to subscribe to %s.", page),
-		Base:   linkBase(link),
+		Base:   withEmailUTM(base, campaignUpdatesSubscribe, "brand"),
 	}.render()
 	if err != nil {
 		return err
@@ -49,15 +51,17 @@ func (c *Client) SendUpdateNotification(ctx context.Context, email, product, pag
 	if summary != "" {
 		text += summary + "\n\n"
 	}
-	text += "View update: " + viewURL + "\n\nUnsubscribe: " + unsubURL + "\n"
+	view := withEmailUTM(viewURL, campaignUpdatesNotification, "view")
+	unsub := withEmailUTM(unsubURL, campaignUpdatesNotification, "unsubscribe")
+	text += "View update: " + view + "\n\nUnsubscribe: " + unsub + "\n"
 	html, err := htmlEmail{
 		Preheader:  summary,
 		Heading:    updateTitle,
 		Intro:      introLines(summary),
-		Button:     &emailButton{Label: "View update", URL: viewURL},
+		Button:     &emailButton{Label: "View update", URL: view},
 		Footer:     fmt.Sprintf("You're receiving this email because you subscribed to updates for %s on %s.", page, product),
-		FooterLink: &emailButton{Label: "Unsubscribe", URL: unsubURL},
-		Base:       viewBase(viewURL),
+		FooterLink: &emailButton{Label: "Unsubscribe", URL: unsub},
+		Base:       withEmailUTM(viewBase(viewURL), campaignUpdatesNotification, "brand"),
 	}.render()
 	if err != nil {
 		return err

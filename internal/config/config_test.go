@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
@@ -12,6 +13,9 @@ func TestLoadDefaults(t *testing.T) {
 	c := fromGetenv(env(nil))
 	if c.Accounts || c.MailgunDomain != "canvasbin.dev" || c.MailFrom != "Canvasbin <noreply@canvasbin.dev>" {
 		t.Fatalf("bad defaults: %+v", c)
+	}
+	if !c.VerifyNudge || c.VerifyNudgeAfter != 24*time.Hour {
+		t.Fatalf("verify nudge defaults: %+v", c)
 	}
 	if c.FreeQuota != 5 || c.ProQuota != 100 {
 		t.Fatalf("bad quotas: %+v", c)
@@ -76,6 +80,34 @@ func TestQuota(t *testing.T) {
 		if IsPro(u) != (want == 100) {
 			t.Errorf("status %q: IsPro mismatch", status)
 		}
+	}
+}
+
+func TestSignalProductFoghorn(t *testing.T) {
+	c := fromGetenv(env(map[string]string{
+		"PRODUCT_TYPE": "signal", "ACCOUNTS": "on", "UPDATES": "on",
+		"MAILGUN_SENDING_KEY": "k", "STRIPE_PRICE_PRO": "price_paid",
+		"PUBLIC_BASE_URL": "https://foghorn.example",
+	}))
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if c.ProductNameOrDefault() != "Foghorn" {
+		t.Fatalf("name %q", c.ProductNameOrDefault())
+	}
+	now := time.Now()
+	if c.HasUpdates(&store.User{}) {
+		t.Error("unverified should not post updates")
+	}
+	verified := &store.User{SubscriptionStatus: "", EmailVerifiedAt: &now}
+	if !c.HasUpdates(verified) {
+		t.Error("trial user should have updates on signal product")
+	}
+	if c.Quota(verified) != SignalSiteQuota {
+		t.Fatalf("quota %d", c.Quota(verified))
+	}
+	if c.TeamBillingEnabled() || c.SignalBillingEnabled() {
+		t.Error("signal product should not expose canvasbin team/signal SKUs")
 	}
 }
 

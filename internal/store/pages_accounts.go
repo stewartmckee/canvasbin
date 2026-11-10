@@ -158,8 +158,21 @@ func (s *Store) UpdateByID(ctx context.Context, id int64, c Changes) error {
 		}
 		c.Format = &f
 	}
-	if c.Content != nil && len(*c.Content) > MaxContentBytes {
-		return ErrTooLarge
+	if c.Content != nil {
+		if len(*c.Content) > MaxContentBytes {
+			return ErrTooLarge
+		}
+		var live string
+		err := s.db.QueryRow(ctx, `SELECT content FROM pages WHERE id = $1`, id).Scan(&live)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if err := checkPublishLength(live, *c.Content, c.ExpectedBytes, c.ConfirmShrink); err != nil {
+			return err
+		}
 	}
 	if c.Title != nil {
 		t := cleanTitle(*c.Title)

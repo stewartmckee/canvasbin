@@ -254,7 +254,12 @@ func ParseClientDocument(clientID string, body []byte) (*Client, error) {
 		ClientName              string   `json:"client_name"`
 		RedirectURIs            []string `json:"redirect_uris"`
 		TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
-		ClientSecret            string   `json:"client_secret"`
+		// Plural list is the methods the client can use. ChatGPT publishes
+		// token_endpoint_auth_method "private_key_jwt" as a preference and
+		// still includes "none" here. The authorization server picks the
+		// intersection with its own methods; this server only offers "none".
+		TokenEndpointAuthMethods []string `json:"token_endpoint_auth_methods_supported"`
+		ClientSecret             string   `json:"client_secret"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return nil, fmt.Errorf("%w: not valid JSON", errBadClientDoc)
@@ -262,7 +267,7 @@ func ParseClientDocument(clientID string, body []byte) (*Client, error) {
 	if doc.ClientID != clientID {
 		return nil, fmt.Errorf("%w: client_id does not match its URL", errBadClientDoc)
 	}
-	if doc.ClientSecret != "" || (doc.TokenEndpointAuthMethod != "" && doc.TokenEndpointAuthMethod != "none") {
+	if !publicCIMDClient(doc.TokenEndpointAuthMethod, doc.TokenEndpointAuthMethods, doc.ClientSecret) {
 		return nil, fmt.Errorf("%w: only public clients (token_endpoint_auth_method none) are supported", errBadClientDoc)
 	}
 	if len(doc.RedirectURIs) == 0 || len(doc.RedirectURIs) > maxRedirectURIs {
@@ -274,6 +279,25 @@ func ParseClientDocument(clientID string, body []byte) (*Client, error) {
 		}
 	}
 	return &Client{ID: clientID, Name: cleanName(doc.ClientName), RedirectURIs: doc.RedirectURIs}, nil
+}
+
+// publicCIMDClient reports whether the document can authenticate with
+// token_endpoint_auth_method "none". A non-empty methods list is the set the
+// client can use; the singular field is only a preference (and, when the list
+// is absent, the legacy requirement). A client_secret is never accepted.
+func publicCIMDClient(method string, methods []string, secret string) bool {
+	if secret != "" {
+		return false
+	}
+	if len(methods) > 0 {
+		for _, m := range methods {
+			if m == "none" {
+				return true
+			}
+		}
+		return false
+	}
+	return method == "" || method == "none"
 }
 
 const maxRedirectURIs = 10

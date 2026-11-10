@@ -8,9 +8,10 @@ import (
 
 // Prices as shown on the pricing page; keep in step with web/src/site.js.
 const (
-	ProPrice    = "£2.99/month"
-	SignalPrice = "£4.99/month"
-	TeamPrice   = "£15/month plus £4 per member"
+	ProPrice         = "£4.99/month (UK) or $7.99/month (elsewhere)"
+	SignalPrice      = "£4.99/month" // legacy Canvasbin Signal add-on (not sold on canvasbin.dev)
+	FoghornPaidPrice = "£7.99/month" // PRODUCT_TYPE=signal paid plan (display; set Stripe to match)
+	TeamPrice        = "£15/month plus £4 per member"
 )
 
 // The errors below wrap the store sentinels with what the user can do next.
@@ -18,6 +19,11 @@ const (
 
 // QuotaError explains that u's personal pages are all in use.
 func (c Config) QuotaError(u *store.User, base string) error {
+	if c.SignalProduct() {
+		name := c.ProductNameOrDefault()
+		return fmt.Errorf("%w: your %s site is already live (one page per account). Update it with create_draft and publish_draft, or delete it before creating another",
+			store.ErrQuotaExceeded, name)
+	}
 	free, pro := c.PlanQuotas()
 	if IsPro(u) {
 		name := "Individual"
@@ -63,18 +69,14 @@ func UnverifiedError(base string) error {
 		store.ErrUnverified, base)
 }
 
-// SignalListed is whether the Signal plan is offered publicly. While it isn't,
-// messages don't name it; keep in step with showSignal in web/src/site.js.
-const SignalListed = false
-
-// UpdatesPlanError explains that page updates come with the Signal plan.
+// UpdatesPlanError explains why page updates are unavailable for this host/plan.
 func (c Config) UpdatesPlanError(base string) error {
-	if !SignalListed {
-		return fmt.Errorf("%w: page updates aren't available on this account's plan", store.ErrUpdatesNotInPlan)
+	if c.SignalProduct() {
+		return fmt.Errorf("%w: verify your email at %s/account to post updates", store.ErrUpdatesNotInPlan, base)
 	}
 	if c.SignalBillingEnabled() {
 		return fmt.Errorf("%w: page updates and email subscribers are part of the Signal plan (%s). The page owner can upgrade at %s/pricing",
 			store.ErrUpdatesNotInPlan, SignalPrice, base)
 	}
-	return fmt.Errorf("%w: page updates and email subscribers are part of the Signal plan", store.ErrUpdatesNotInPlan)
+	return fmt.Errorf("%w: page updates aren't available on this account's plan", store.ErrUpdatesNotInPlan)
 }

@@ -84,7 +84,10 @@ func run() error {
 		mcpOpts.Mailer = srv.Mailer
 		mcpOpts.MailLimit = srv.MailLimit
 		go pruneExpired(ctx, st)
-		slog.Info("accounts enabled", "billing", srv.Billing.Enabled())
+		if cfg.VerifyNudge {
+			go srv.RunVerificationNudgeWorker(ctx)
+		}
+		slog.Info("accounts enabled", "billing", srv.Billing.Enabled(), "verify_nudge", cfg.VerifyNudge)
 	}
 	if cfg.Updates {
 		mcpOpts.Mailer = srv.Mailer

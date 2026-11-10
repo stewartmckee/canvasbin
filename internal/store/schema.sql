@@ -18,6 +18,17 @@ ALTER TABLE pages ADD COLUMN IF NOT EXISTS owner_id bigint;
 ALTER TABLE pages ADD COLUMN IF NOT EXISTS read_key text;
 ALTER TABLE pages ADD COLUMN IF NOT EXISTS agentic_only boolean NOT NULL DEFAULT false;
 
+-- One unpublished draft per page. Replacing it does not touch the live row.
+CREATE TABLE IF NOT EXISTS page_drafts (
+    id           bigserial PRIMARY KEY,
+    page_id      bigint      NOT NULL UNIQUE REFERENCES pages(id) ON DELETE CASCADE,
+    title        text,
+    format       text,
+    content      text        NOT NULL,
+    agentic_only boolean,
+    created_at   timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id                     bigserial PRIMARY KEY,
     email                  text        NOT NULL UNIQUE,
@@ -34,6 +45,8 @@ CREATE TABLE IF NOT EXISTS users (
     created_at             timestamptz NOT NULL DEFAULT now(),
     updated_at             timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verify_nudge_sent_at timestamptz;
 
 DO $$
 BEGIN

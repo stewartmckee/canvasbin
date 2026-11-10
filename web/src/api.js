@@ -30,6 +30,18 @@ export const createPage = async (page) => {
 }
 export const getPage = (key) => request('GET', `/api/pages/${encodeURIComponent(key)}`)
 export const updatePage = (key, page) => request('PUT', `/api/pages/${encodeURIComponent(key)}`, page)
+
+// savePage stores a draft, then publishes it. expected_bytes is the UTF-8
+// length of the source in this editor, so a truncated body cannot publish.
+export const savePage = async (key, page) => {
+  const draft = await request('POST', `/api/pages/${encodeURIComponent(key)}/draft`, page)
+  const bytes = new TextEncoder().encode(page.content ?? '').length
+  return request('POST', `/api/pages/${encodeURIComponent(key)}/publish`, {
+    draft_id: draft.draft_id,
+    expected_bytes: bytes,
+    confirm_shrink: draft.live_bytes > 0 && bytes * 2 < draft.live_bytes,
+  })
+}
 export const deletePage = (key) => request('DELETE', `/api/pages/${encodeURIComponent(key)}`)
 export const renderPreview = (page) => request('POST', '/api/render', page)
 export const setUpdatesEnabled = (key, enabled) =>

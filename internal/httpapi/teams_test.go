@@ -88,8 +88,8 @@ func TestTeams(t *testing.T) {
 	if mp["can_write"] != true || mp["role"] != "editor" || mp["team_role"] != "member" {
 		t.Fatalf("member view: %v", mp)
 	}
-	member.want(200, "PUT", "/api/pages/"+readKey, map[string]string{"content": "<p>v2</p>"})
-	member.want(200, "PUT", "/api/pages/"+readKey, map[string]string{"content": "<p>v3</p>"})
+	member.publishContent(readKey, "<p>v2</p>")
+	member.publishContent(readKey, "<p>v3</p>")
 	member.want(403, "DELETE", "/api/pages/"+readKey, nil)
 	lib := member.want(200, "GET", "/api/library", nil)["pages"].([]any)
 	if len(lib) != 1 || lib[0].(map[string]any)["team_name"] != "Acme Docs" {

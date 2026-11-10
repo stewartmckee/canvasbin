@@ -31,7 +31,7 @@ async function choose(next) {
 </script>
 
 <template>
-  <div class="plans" :class="site.showSignal ? 'plans-4' : 'plans-3'">
+  <div class="plans plans-3">
     <article class="plan">
       <h3>Free</h3>
       <p class="price">£0</p>
@@ -40,7 +40,7 @@ async function choose(next) {
         <li>Up to {{ auth.freeQuota }} pages</li>
         <li>Read-only and edit links for every page</li>
         <li>Rendered page, PDF and Markdown downloads</li>
-        <li>Publish from Claude, ChatGPT and Cursor</li>
+        <li>Publish from your connected AI assistant</li>
         <li>Small “Made with Canvasbin” badge on pages</li>
       </ul>
       <RouterLink v-if="!currentUser" to="/register" class="btn" @click="track('plan-click', { plan: 'free' })">
@@ -79,39 +79,6 @@ async function choose(next) {
         {{ busy === 'pro' ? 'Opening checkout…' : isPaid ? 'Switch to Individual' : 'Upgrade to Individual' }}
       </button>
       <p v-if="error && errorPlan === 'pro'" class="field-error">{{ error }}</p>
-    </article>
-    <article v-if="site.showSignal" class="plan">
-      <h3>Signal</h3>
-      <p class="price">
-        {{ site.signalPrice }}<span class="per">/{{ site.proInterval }}</span>
-      </p>
-      <p class="muted">For pages people follow: post updates and readers get them by email.</p>
-      <ul>
-        <li>Up to {{ auth.signalQuota }} pages</li>
-        <li>Post updates on your pages</li>
-        <li>Readers subscribe by email and get every update</li>
-        <li>No Canvasbin badge</li>
-        <li>Cancel any time from your account</li>
-      </ul>
-      <RouterLink
-        v-if="!currentUser"
-        :to="{ path: '/register', query: { plan: 'signal' } }"
-        class="btn"
-        @click="track('plan-click', { plan: 'signal' })"
-      >
-        Start with Signal
-      </RouterLink>
-      <RouterLink v-else-if="plan === 'signal'" to="/account" class="btn">Manage billing</RouterLink>
-      <button
-        v-else-if="auth.signalBillingEnabled"
-        type="button"
-        class="btn"
-        :disabled="Boolean(busy)"
-        @click="choose('signal')"
-      >
-        {{ busy === 'signal' ? 'Opening checkout…' : isPaid ? 'Switch to Signal' : 'Upgrade to Signal' }}
-      </button>
-      <p v-if="error && errorPlan === 'signal'" class="field-error">{{ error }}</p>
     </article>
     <article class="plan">
       <h3>Team</h3>

@@ -22,7 +22,7 @@ import AgentScratchpadHubView from './views/AgentScratchpadHubView.vue'
 import AgentScratchpadView from './views/AgentScratchpadView.vue'
 import ConnectView from './views/ConnectView.vue'
 import { auth, currentUser, initAuth, isAdmin } from './auth.js'
-import { applySeo } from './seo.js'
+import { applySeo, defaultQuotas } from './seo.js'
 import { pageview } from './analytics.js'
 
 const marketing = (title) => ({ accounts: true, title })
@@ -114,7 +114,8 @@ function installGuards(router) {
       pageview()
       return
     }
-    if (!applySeo(to.path, auth.accounts && !currentUser.value)) {
+    const signedOutMarketing = auth.accounts && !currentUser.value
+    if (!applySeo(to.path, signedOutMarketing, defaultQuotas(auth))) {
       document.title = to.meta.title ? `${to.meta.title} · Canvasbin` : 'Canvasbin'
     }
     pageview()

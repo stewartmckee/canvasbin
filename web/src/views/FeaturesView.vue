@@ -28,7 +28,15 @@ const groups = [
     id: 'ai',
     title: 'Work with AI',
     items: [
-      ['Claude, ChatGPT and Cursor', 'Connect once and your assistant can publish, update and share pages for you.'],
+      ['Connect your agent', 'Sign in once and your assistant can publish, update and share pages for you over MCP.'],
+      [
+        'Back up agent context',
+        'Ask your agent to save decisions, todos and summaries to an agent scratchpad on Canvasbin — durable storage outside the chat thread.',
+      ],
+      [
+        'Share context across platforms',
+        'Keep one agentic-only context page that every MCP client can read and update, so your assistants stay aligned without repeating yourself.',
+      ],
       ['Remote MCP server', 'Canvasbin is a remote MCP server over Streamable HTTP, so it works with any MCP client.'],
       ['Secure sign-in', 'Your AI asks you to sign in to Canvasbin before it publishes, and only acts on your account.'],
       ['Keeps pages current', 'Ask your assistant to refresh a report and the same link shows the new version.'],
@@ -44,6 +52,8 @@ const groups = [
       ['/connect/claude', 'Canvasbin for Claude'],
       ['/connect/chatgpt', 'Canvasbin for ChatGPT'],
       ['/connect/cursor', 'Canvasbin for Cursor'],
+      ['/agent-scratchpad/backup-ai-chats', 'Back up agent context'],
+      ['/agent-scratchpad/share-context-across-platforms', 'Share context across platforms'],
       ['/use-cases', 'Live examples'],
     ],
   },
@@ -76,7 +86,7 @@ const groups = [
       <h1>HTML and Markdown publishing, built for AI</h1>
       <p class="lead">
         Everything you need to publish a page, share it with the right people and keep it up to date, by hand or from
-        Claude, ChatGPT and Cursor.
+        your agent.
       </p>
     </header>
     <section v-for="g in groups" :id="g.id" :key="g.title" class="section">

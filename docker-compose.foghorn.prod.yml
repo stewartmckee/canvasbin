@@ -1,0 +1,79 @@
+name: foghorn
+
+# Foghorn (PRODUCT_TYPE=signal) on ubuntu-desktop via Dockhand.
+# Deploy: scripts/deploy-foghorn.sh
+#
+# Until foghorn.site is purchased and NPM/SSL is set up, the app is published on
+# host port 8085 (HTTP). Set PUBLIC_BASE_URL to match; change when foghorn.site + NPM/SSL are live.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: foghorn-postgres
+    restart: unless-stopped
+    networks:
+      - foghorn_internal
+    environment:
+      POSTGRES_USER: foghorn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: foghorn
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foghorn -d foghorn"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  foghorn:
+    image: stewartmckee/canvasbin:${CANVASBIN_VERSION:-latest}
+    container_name: foghorn
+    platform: linux/amd64
+    pull_policy: missing
+    restart: unless-stopped
+    ports:
+      - "${FOGHORN_HTTP_PORT:-8085}:8080"
+    networks:
+      - foghorn_internal
+      - nginxproxymanager_default
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://foghorn:${POSTGRES_PASSWORD}@postgres:5432/foghorn?sslmode=disable
+      HTTP_ADDR: ":8080"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://192.168.7.130:8085}
+      ACCOUNTS: ${ACCOUNTS:-on}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      PRODUCT_TYPE: signal
+      PRODUCT_NAME: ${PRODUCT_NAME:-Foghorn}
+      UPDATES: ${UPDATES:-on}
+      UPDATES_MODE: ${UPDATES_MODE:-feed}
+      MAILGUN_SENDING_KEY: ${MAILGUN_SENDING_KEY:-}
+      MAILGUN_DOMAIN: ${MAILGUN_DOMAIN:-}
+      MAIL_FROM: ${MAIL_FROM:-Foghorn <noreply@foghorn.site>}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_PRO_USD: ${STRIPE_PRICE_PRO_USD:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      OPENAI_APPS_CHALLENGE: ${OPENAI_APPS_CHALLENGE:-}
+      UMAMI_URL: ${UMAMI_URL:-}
+      UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+    security_opt:
+      - seccomp:unconfined
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  pgdata: {}
+
+networks:
+  foghorn_internal:
+    name: foghorn_internal
+  nginxproxymanager_default:
+    external: true

@@ -2,12 +2,12 @@
 // assistant. `tabs` picks the setup instructions shown from McpConnect.
 
 export const connectHub = {
-  seoTitle: 'Canvasbin MCP server: publish pages from Claude, ChatGPT and Cursor',
+  seoTitle: 'Canvasbin MCP server: publish pages from your AI assistant',
   seoDescription:
-    'Connect the Canvasbin remote MCP server to Claude, ChatGPT, Cursor, VS Code or Codex, and let your AI assistant publish and update HTML and Markdown pages.',
+    'Connect the Canvasbin remote MCP server to your AI client. Publish pages, back up agent context, and share project notes across every platform.',
   eyebrow: 'Remote MCP server',
   title: 'Connect your AI assistant to Canvasbin',
-  lead: 'Canvasbin is a remote MCP server. Add it to Claude, ChatGPT, Cursor or any MCP client, sign in once, and your assistant can publish HTML and Markdown pages at a shareable link and keep them up to date.',
+  lead: 'Canvasbin is a remote MCP server. Add it to your AI client, sign in once, and your agent can publish HTML and Markdown pages at a shareable link and keep them up to date. Use agent scratchpads to back up agent context and share the same notes across every assistant you connect.',
   faqs: [
     [
       'What is an MCP server?',
@@ -64,7 +64,7 @@ export const assistants = [
       ],
       [
         'Can Claude update a page after publishing it?',
-        'Yes. Claude calls update_page with the page’s write key. The link stays the same and anyone viewing the page sees the new version straight away.',
+        'Yes. Claude stores a draft with create_draft, then publishes it with publish_draft. The link stays the same and anyone viewing the page sees the new version once it is published.',
       ],
       [
         'Does it work in Claude Code?',
@@ -137,9 +137,14 @@ export const assistants = [
 // What an assistant can do once connected; mirrors the MCP tools.
 export const connectTools = [
   ['Publish pages', 'Create an HTML or Markdown page and get its shareable link, PDF link and edit link.', 'create_page'],
-  ['Update pages', 'Change a page’s content or title. Everyone viewing it sees the change live.', 'update_page'],
+  ['Update pages', 'Store a draft, then publish it. Everyone viewing the page sees the change once it is published.', 'create_draft'],
   ['Read pages', 'Fetch a page back to revise, summarise or build on it.', 'get_page'],
   ['Browse your library', 'List your pages, pages shared with you and your team pages.', 'list_pages'],
+  [
+    'Agent scratchpads',
+    'Create agentic-only pages for agent context backups and cross-platform project notes (hidden from your web library by default).',
+    'create_page (agentic_only)',
+  ],
   ['Delete pages', 'Remove a page you no longer need. Clients that support it ask you to confirm first.', 'delete_page'],
   ['Share with people', 'Invite people by email as viewers or editors (Team plan).', 'share_page'],
   ['Publish to a team', 'Create pages in a shared team space everyone can edit.', 'list_teams'],

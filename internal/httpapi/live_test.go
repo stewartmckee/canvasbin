@@ -67,7 +67,7 @@ func TestLiveUpdates(t *testing.T) {
 	}()
 	var got liveMessage
 	for i := 0; got.Type == "" && i < 10; i++ {
-		c.want(200, "PUT", "/api/pages/"+writeKey, map[string]any{"content": "<p>v" + string(rune('a'+i)) + "</p>"})
+		c.publishContent(writeKey, "<p>v"+string(rune('a'+i))+"</p>")
 		select {
 		case got = <-msgs:
 		case <-time.After(time.Second):

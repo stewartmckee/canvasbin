@@ -21,7 +21,7 @@ import (
 // accountInstructions replaces the anonymous-only text when accounts are on.
 const accountInstructions = `Canvasbin hosts HTML or Markdown pages at unguessable URLs. You are signed in to the user's Canvasbin account (OAuth).
 
-create_page publishes into the user's own library and counts toward their page quota; pass team (a team name or id from list_teams) to publish into a shared team space instead. get_page, update_page and delete_page work on pages the user owns, that were shared with them, or that belong to one of their teams (by read key or URL), and on any page you hold the write key for. Account tools:
+create_page publishes into the user's own library and counts toward their page quota; pass team (a team name or id from list_teams) to publish into a shared team space instead. get_page, create_draft, publish_draft and delete_page work on pages the user owns, that were shared with them, or that belong to one of their teams (by read key or URL), and on any page you hold the write key for. Account tools:
 - list_pages: list every page the user owns, has been shared, or can reach through a team (with role, team and links).
 - list_teams: the user's teams, with role, plan status and page counts.
 - claim_page: take ownership of an anonymous page you hold the write key for, so it appears in the user's library.
@@ -33,6 +33,11 @@ create_page publishes into the user's own library and counts toward their page q
 When the page quota is full, create_page and claim_page return an error that explains the user's options. Users delete pages they no longer need to stay within quota—when they ask to free space, stay under quota, remove old pages, or delete a specific page, call delete_page with that page's write key or write URL (list_pages helps find titles and keys). If they want several removed but do not name them, list their library, suggest which pages look disposable, and delete the ones they confirm.
 
 Style guides are a Team plan feature. Before create_page into a team, call get_style_guide with that team's name or id. If it returns a style guide, follow it when you write the page. If the guide is empty, or the team's plan is not active, write the page as usual. Personal pages have no style guide. When the user wants to set or change how a team's pages are written, call set_style_guide: it creates the guide if there isn't one and updates it if there is.
+
+` + pageInstructions
+
+// signalSiteInstructions is used when PRODUCT_TYPE=signal (e.g. Foghorn): one site per account.
+const signalSiteInstructions = `This host is a single-site product: each account has exactly one public page that is their website. create_page provisions that site once; further create_page calls fail until they delete their page. create_draft then publish_draft edits the live site. post_update publishes short news items on the page; visitors subscribe by email. There are no team workspaces on this product—never pass team on create_page.
 
 ` + pageInstructions
 

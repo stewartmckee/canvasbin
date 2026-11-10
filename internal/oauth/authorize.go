@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -93,7 +94,8 @@ func (p *Provider) authorizeGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !u.Verified() {
-		errorPage(w, http.StatusForbidden, "Verify your email address before connecting an app.")
+		next := url.QueryEscape(r.URL.RequestURI())
+		http.Redirect(w, r, "/account?connect=verify&next="+next, http.StatusFound)
 		return
 	}
 	p.renderConsent(w, r, req, u)
@@ -116,8 +118,12 @@ func (p *Provider) authorizePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := p.SessionUser(r)
-	if u == nil || !u.Verified() {
+	if u == nil {
 		errorPage(w, http.StatusUnauthorized, "Your session has expired. Sign in and start again from the app.")
+		return
+	}
+	if !u.Verified() {
+		http.Redirect(w, r, "/account?connect=verify", http.StatusFound)
 		return
 	}
 	token, _ := auth.TokenFromRequest(r)
@@ -148,7 +154,12 @@ func (p *Provider) authorizePost(w http.ResponseWriter, r *http.Request) {
 		errorPage(w, http.StatusInternalServerError, "Something went wrong. Try again.")
 		return
 	}
-	redirectClient(w, r, req.RedirectURI, base, req.State, map[string]string{"code": code})
+	returnURL, err := buildClientRedirect(req.RedirectURI, base, req.State, map[string]string{"code": code})
+	if err != nil {
+		errorPage(w, http.StatusBadRequest, "Invalid redirect_uri.")
+		return
+	}
+	p.renderConnected(w, req, returnURL)
 }
 
 func (p *Provider) respondFailure(w http.ResponseWriter, r *http.Request, base string, f *authFailure) {
@@ -161,13 +172,11 @@ func (p *Provider) respondFailure(w http.ResponseWriter, r *http.Request, base s
 	})
 }
 
-// redirectClient sends the browser back to the client with params, the state
-// and the issuer (RFC 9207 mix-up defence).
-func redirectClient(w http.ResponseWriter, r *http.Request, redirectURI, issuer, state string, params map[string]string) {
+// buildClientRedirect returns the URL the OAuth client expects after consent.
+func buildClientRedirect(redirectURI, issuer, state string, params map[string]string) (string, error) {
 	u, err := url.Parse(redirectURI)
 	if err != nil {
-		errorPage(w, http.StatusBadRequest, "Invalid redirect_uri.")
-		return
+		return "", err
 	}
 	q := u.Query()
 	for k, v := range params {
@@ -178,8 +187,19 @@ func redirectClient(w http.ResponseWriter, r *http.Request, redirectURI, issuer,
 	}
 	q.Set("iss", issuer)
 	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+// redirectClient sends the browser back to the client with params, the state
+// and the issuer (RFC 9207 mix-up defence).
+func redirectClient(w http.ResponseWriter, r *http.Request, redirectURI, issuer, state string, params map[string]string) {
+	u, err := buildClientRedirect(redirectURI, issuer, state, params)
+	if err != nil {
+		errorPage(w, http.StatusBadRequest, "Invalid redirect_uri.")
+		return
+	}
 	w.Header().Set("Cache-Control", "no-store")
-	http.Redirect(w, r, u.String(), http.StatusSeeOther)
+	http.Redirect(w, r, u, http.StatusSeeOther)
 }
 
 // csrfToken binds the consent form to the browser session. The session token is
@@ -229,6 +249,42 @@ var errorTmpl = template.Must(template.New("error").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>Canvasbin</title><style>` + pageCSS + `</style></head>
 <body><main><h1>Can't connect this app</h1><p>{{.}}</p></main></body></html>`))
+
+var oauthStarterPrompts = []string{
+	"Create a new canvasbin and put a game of tic tac toe on it.",
+	"Create a canvasbin with the latest agentic news, create it in a newsroom style and make it a single page application with navigation and in depth articles.",
+	"Publish the main content of this conversation as a polished Canvasbin HTML page and give me the links.",
+}
+
+var connectedTmpl = template.Must(template.New("connected").Parse(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>Connected to Canvasbin</title><style>` + pageCSS + `
+.prompt{background:#f6f6f7;border-radius:8px;padding:.75rem 1rem;margin:.75rem 0;font-size:.9rem}
+.copy{font-size:.8rem;color:#444;margin-top:.35rem}
+a.continue{display:inline-block;margin-top:1.25rem;padding:.65rem 1.2rem;border-radius:8px;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:600}
+a.continue:hover{background:#333}
+</style></head>
+<body><main>
+<h1>You're connected</h1>
+<p class="muted">{{if .Name}}{{.Name}}{{else}}Your assistant{{end}} can use Canvasbin. Return to the app, or try one of these prompts there:</p>
+{{range .Prompts}}<div class="prompt">{{.}}<div class="copy">Copy into your assistant</div></div>{{end}}
+<p class="muted">Examples: <a href="/use-cases/news-apps-games">news page, newsroom app, game</a></p>
+<a class="continue" href="{{.ReturnURL}}">Continue to your assistant</a>
+<p class="muted" style="margin-top:1.5rem">This tab will redirect automatically in a few seconds.</p>
+</main>
+<script>setTimeout(function(){location.replace({{.ReturnJSON}})},8000)</script>
+</body></html>`))
+
+func (p *Provider) renderConnected(w http.ResponseWriter, req *authRequest, returnURL string) {
+	setPageHeaders(w)
+	returnJSON, _ := json.Marshal(returnURL)
+	_ = connectedTmpl.Execute(w, map[string]any{
+		"Name":       req.Client.Name,
+		"Prompts":    oauthStarterPrompts,
+		"ReturnURL":  returnURL,
+		"ReturnJSON": template.JS(returnJSON),
+	})
+}
 
 func setPageHeaders(w http.ResponseWriter) {
 	h := w.Header()

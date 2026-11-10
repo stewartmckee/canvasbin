@@ -28,7 +28,17 @@ const features = [
   {
     title: 'Built for AI agents',
     to: '/connect',
-    body: 'Claude, ChatGPT and Cursor publish and update pages through the Canvasbin MCP server. Sign in once and they just work.',
+    body: 'Your agent publishes and updates pages through the Canvasbin MCP server. Sign in once and it just works.',
+  },
+  {
+    title: 'Back up agent context',
+    to: '/agent-scratchpad/backup-ai-chats',
+    body: 'Keep decisions, todos and thread summaries on an agent scratchpad you control — outside any chat app’s history and context window.',
+  },
+  {
+    title: 'Share context across platforms',
+    to: '/agent-scratchpad/share-context-across-platforms',
+    body: 'One agentic-only page every connected assistant can read and update, so you do not re-brief each tool from scratch.',
   },
   {
     title: 'Live updates',
@@ -61,8 +71,8 @@ const features = [
       <h1>Turn HTML and Markdown — yours or your AI’s — into a page you can share.</h1>
       <p class="lead">
         Canvasbin hosts every page at a shareable link, with a PDF and a private edit link. Connect the Canvasbin MCP
-        server and Claude, ChatGPT or Cursor publish reports, dashboards and prototypes for you, and keep them up to
-        date.
+        server and your agent can publish reports, dashboards and prototypes for you, and keep them up to date. You can
+        also back up agent context and share the same project notes across every platform.
       </p>
       <div class="hero-actions">
         <RouterLink to="/register" class="btn primary large">Get started free</RouterLink>
@@ -120,8 +130,8 @@ const features = [
       <div>
         <h2>Let your AI publish for you</h2>
         <p class="muted">
-          Ask Claude, ChatGPT or Cursor to turn its answer into a page, and you get a link back — ready to send. Your
-          agent can update the page later, and everything it publishes lands in your library.
+          Ask your agent to turn an answer into a page, and you get a link back — ready to send. It can update the page
+          later, and everything it publishes lands in your library.
         </p>
         <p class="related-links">
           <RouterLink to="/connect/claude">Canvasbin for Claude</RouterLink>
@@ -130,6 +140,23 @@ const features = [
         </p>
       </div>
       <RouterLink to="/connect" class="btn primary">Connect your AI</RouterLink>
+    </section>
+
+    <section id="context" class="section band">
+      <div>
+        <h2>Back up agent context. Share it between platforms.</h2>
+        <p class="muted">
+          Agent scratchpads are pages your agent keeps outside any single chat app. Back up what matters from your
+          conversations, or maintain one living context sheet every connected assistant can pick up — all over the same
+          MCP connection.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <RouterLink to="/agent-scratchpad/backup-ai-chats" class="btn">Backup AI chats</RouterLink>
+        <RouterLink to="/agent-scratchpad/share-context-across-platforms" class="btn primary">
+          Share context across platforms
+        </RouterLink>
+      </div>
     </section>
 
     <section id="use-cases" class="section">

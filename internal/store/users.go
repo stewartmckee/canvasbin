@@ -96,6 +96,12 @@ func (s *Store) GetUserByStripeCustomer(ctx context.Context, customerID string) 
 }
 
 // SetVerified marks the email verified (first verification wins).
+// TouchUserCreatedAt sets created_at (for tests and backfills).
+func (s *Store) TouchUserCreatedAt(ctx context.Context, userID int64, createdAt time.Time) error {
+	_, err := s.db.Exec(ctx, `UPDATE users SET created_at = $2, updated_at = now() WHERE id = $1`, userID, createdAt)
+	return err
+}
+
 func (s *Store) SetVerified(ctx context.Context, userID int64) error {
 	_, err := s.db.Exec(ctx,
 		`UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = now() WHERE id = $1`, userID)

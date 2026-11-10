@@ -51,6 +51,9 @@ func (f *fakeMailer) SendTeamInvite(_ context.Context, e, l, _, _ string) error 
 func (f *fakeMailer) SendWelcome(_ context.Context, e, base string) error {
 	return f.put("welcome", e, base)
 }
+func (f *fakeMailer) SendVerifyNudge(_ context.Context, e, l, _ string) error {
+	return f.put("verify_nudge", e, l)
+}
 
 type env struct {
 	srv  *httptest.Server
@@ -127,6 +130,15 @@ func (c *client) do(method, path string, body any) (int, map[string]any) {
 	var out map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&out)
 	return resp.StatusCode, out
+}
+
+func (c *client) publishContent(key, content string) map[string]any {
+	c.t.Helper()
+	d := c.want(200, "POST", "/api/pages/"+key+"/draft", map[string]string{"content": content})
+	return c.want(200, "POST", "/api/pages/"+key+"/publish", map[string]any{
+		"draft_id":       int64(d["draft_id"].(float64)),
+		"expected_bytes": len(content),
+	})
 }
 
 func (c *client) want(code int, method, path string, body any) map[string]any {
@@ -293,7 +305,7 @@ func TestOwnedPagesQuotaAndSharing(t *testing.T) {
 		t.Fatalf("anon get: %v", got)
 	}
 	anon.want(403, "PUT", "/api/pages/"+readKey, map[string]string{"content": "x"})
-	owner.want(200, "PUT", "/api/pages/"+readKey, map[string]string{"content": "<p>v2</p>"})
+	owner.publishContent(readKey, "<p>v2</p>")
 	// Anonymous write-key access is unchanged.
 	anon.want(200, "PUT", "/api/pages/"+writeKey, map[string]string{"title": "A2"})
 
@@ -312,7 +324,7 @@ func TestOwnedPagesQuotaAndSharing(t *testing.T) {
 	if len(lst["shares"].([]any)) != 1 {
 		t.Fatalf("shares: %v", lst)
 	}
-	friend.want(200, "PUT", "/api/pages/"+readKey, map[string]string{"content": "<p>friend</p>"})
+	friend.publishContent(readKey, "<p>friend</p>")
 	friend.want(403, "DELETE", "/api/pages/"+readKey, nil)
 	lib := friend.want(200, "GET", "/api/library", nil)
 	pages := lib["pages"].([]any)
@@ -450,7 +462,7 @@ func TestLegacyLinksWithAccountsOn(t *testing.T) {
 		if g := c.want(200, "GET", "/api/pages/"+wk, nil); g["can_write"] != true || g["write_key"] != wk {
 			t.Fatalf("write key lost access: %v", g)
 		}
-		c.want(200, "PUT", "/api/pages/"+wk, map[string]string{"content": "# edited"})
+		c.publishContent(wk, "# edited")
 	}
 
 	// A signed-in write-key holder can still delete an unowned legacy page.
@@ -469,7 +481,7 @@ func TestMarketingPagesIndexable(t *testing.T) {
 		return resp
 	}
 	on := newEnv(t, true, 20)
-	for _, p := range []string{"/", "/features", "/pricing", "/privacy", "/terms", "/contact", "/use-cases", "/use-cases/family", "/use-cases/news-apps-games"} {
+	for _, p := range marketingPaths {
 		if r := get(on.srv, p); r.StatusCode != 200 || r.Header.Get("X-Robots-Tag") != "" {
 			t.Errorf("%s: status %d robots %q", p, r.StatusCode, r.Header.Get("X-Robots-Tag"))
 		}
@@ -596,7 +608,7 @@ func TestAccountsOffKeepsAnonymousAPI(t *testing.T) {
 	}
 	rk, wk := p["read_key"].(string), p["write_key"].(string)
 	c.want(403, "PUT", "/api/pages/"+rk, map[string]string{"content": "x"})
-	c.want(200, "PUT", "/api/pages/"+wk, map[string]string{"content": "v2"})
+	c.publishContent(wk, "v2")
 	if g := c.want(200, "GET", "/api/pages/"+rk, nil); g["content"] != "v2" {
 		t.Fatalf("get: %v", g)
 	}

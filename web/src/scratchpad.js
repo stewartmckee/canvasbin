@@ -3,20 +3,20 @@
 export const scratchpadHub = {
   seoTitle: 'Agent scratchpads: external storage for your AI',
   seoDescription:
-    'Canvasbin agent scratchpads are pages your assistant keeps for context and backups. They stay out of your library by default but are always available over MCP.',
+    'Back up agent context and share project notes across every assistant you connect. Agent scratchpads stay out of your web library by default but are always available over MCP.',
 }
 
 export const scratchpadPages = [
   {
     slug: 'share-context-across-platforms',
     label: 'Share context across platforms',
-    seoTitle: 'Share AI context across Claude, ChatGPT and Cursor',
+    seoTitle: 'Share AI context across platforms',
     seoDescription:
       'Keep one agent scratchpad on Canvasbin that every MCP-connected assistant can read and update, so you do not re-brief each platform from scratch.',
     eyebrow: 'Cross-platform context',
     title: 'One context sheet every assistant can read.',
     lead:
-      'Claude, ChatGPT and Cursor do not share memory. Store project context, decisions and open questions in an agentic-only Canvasbin page and let whichever tool you use pick up where you left off.',
+      'Your assistants do not share memory. Store project context, decisions and open questions in an agentic-only Canvasbin page and let whichever tool you use pick up where you left off.',
     problem: [
       'Each assistant keeps its own threads and forgets what you told another.',
       'Switching tools means repeating stack choices, names, and constraints.',
@@ -25,7 +25,7 @@ export const scratchpadPages = [
     solution: [
       'Ask an agent to create or update a Canvasbin page with agentic_only set.',
       'The page lives in your account but stays hidden from the web library by default.',
-      'Any MCP client signed in to your account can list_pages, get_page and update_page.',
+      'Any MCP client signed in to your account can list_pages, get_page, create_draft and publish_draft.',
     ],
     prompts: [
       'Create an agent scratchpad on Canvasbin with my project context (stack, decisions, open questions). Set agentic_only true.',
@@ -48,7 +48,7 @@ export const scratchpadPages = [
     label: 'Backup AI chats',
     seoTitle: 'Back up AI chats you own on Canvasbin',
     seoDescription:
-      'Keep a durable copy of what matters from your assistant conversations on Canvasbin agent scratchpads, outside any single chat provider.',
+      'Back up agent context and chat threads on Canvasbin agent scratchpads — durable storage outside any single chat provider.',
     eyebrow: 'Chat backup',
     title: 'A backup you control when the chat app cannot help.',
     lead:
@@ -60,7 +60,7 @@ export const scratchpadPages = [
     ],
     solution: [
       'Ask your agent to append or replace an agentic-only scratchpad with structured notes: date, decisions, todos, key quotes.',
-      'The same link always shows the latest version after update_page.',
+      'The same link always shows the latest version after publish_draft.',
       'Data sits in your Canvasbin library logic over MCP, not only inside the chat UI.',
     ],
     prompts: [

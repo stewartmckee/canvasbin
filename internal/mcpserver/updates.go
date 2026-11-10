@@ -17,7 +17,7 @@ import (
 // updateInstructions is appended to the server instructions when page updates are on.
 const updateInstructions = `
 
-Page updates are emailed to every subscriber when they are published, and a published update can't be recalled. Before you call post_update (or update_page with notify: true), review it with the user:
+Page updates are emailed to every subscriber when they are published, and a published update can't be recalled. Before you call post_update (or publish_draft with notify: true), review it with the user:
 1. Show the exact title and body you will post, and the page it will go on.
 2. Ask whether to publish it now or schedule it for later. For later, agree a date and time and confirm the timezone, then pass publish_at as an ISO 8601 time with that offset (for example 2026-10-22T18:00:00+01:00).
 3. Post only once they approve the wording and the timing. If they ask for changes, show the revised draft again.
@@ -77,7 +77,7 @@ type PostUpdateResult struct {
 
 func (t *tools) postUpdate(ctx context.Context, _ *mcp.CallToolRequest, in PostUpdateInput) (*mcp.CallToolResult, PostUpdateResult, error) {
 	if !t.Config.UpdatesFeed() {
-		return nil, PostUpdateResult{}, errors.New("post_update is not available in notify_on_page_edit mode; use update_page with notify: true")
+		return nil, PostUpdateResult{}, errors.New("post_update is not available in notify_on_page_edit mode; use publish_draft with notify: true")
 	}
 	key, err := keys.Parse(in.Key)
 	if err != nil {

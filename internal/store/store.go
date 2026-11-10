@@ -31,10 +31,11 @@ const (
 )
 
 var (
-	ErrNotFound  = errors.New("page not found")
-	ErrReadOnly  = errors.New("this key is read-only")
-	ErrTooLarge  = fmt.Errorf("content exceeds %d bytes", MaxContentBytes)
-	ErrBadFormat = errors.New(`format must be "html" or "markdown"`)
+	ErrNotFound      = errors.New("page not found")
+	ErrReadOnly      = errors.New("this key is read-only")
+	ErrTooLarge      = fmt.Errorf("content exceeds %d bytes", MaxContentBytes)
+	ErrBadFormat     = errors.New(`format must be "html" or "markdown"`)
+	ErrDraftNotFound = errors.New("draft not found")
 
 	// Account-related errors.
 	ErrEmailTaken    = errors.New("an account with that email already exists")
@@ -75,11 +76,17 @@ type Access struct {
 }
 
 // Changes holds optional fields for an update.
+//
+// When Content is set, ExpectedBytes must be the byte length of that content.
+// A mismatch, or a draft under half the live page without ConfirmShrink, leaves
+// the live page unchanged.
 type Changes struct {
-	Title       *string
-	Format      *string
-	Content     *string
-	AgenticOnly *bool
+	Title         *string
+	Format        *string
+	Content       *string
+	AgenticOnly   *bool
+	ExpectedBytes *int
+	ConfirmShrink bool
 }
 
 type Store struct {
@@ -221,8 +228,21 @@ func (s *Store) Update(ctx context.Context, writeKey string, c Changes) (*Access
 		}
 		c.Format = &f
 	}
-	if c.Content != nil && len(*c.Content) > MaxContentBytes {
-		return nil, ErrTooLarge
+	if c.Content != nil {
+		if len(*c.Content) > MaxContentBytes {
+			return nil, ErrTooLarge
+		}
+		var live string
+		err := s.db.QueryRow(ctx, `SELECT content FROM pages WHERE write_key_hash = $1`, keys.Hash(writeKey)).Scan(&live)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, s.missingOrReadOnly(ctx, writeKey)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if err := checkPublishLength(live, *c.Content, c.ExpectedBytes, c.ConfirmShrink); err != nil {
+			return nil, err
+		}
 	}
 	if c.Title != nil {
 		t := cleanTitle(*c.Title)

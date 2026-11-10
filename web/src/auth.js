@@ -1,5 +1,6 @@
 import { computed, reactive } from 'vue'
 import { getConfig, getMe, logoutRequest, startCheckout } from './api.js'
+import { applySiteConfig, site } from './site.js'
 
 // Shared auth state. `me` is the /api/me payload: { user, is_admin, plan, quota, page_count, teams, ... }.
 export const auth = reactive({
@@ -8,6 +9,7 @@ export const auth = reactive({
   billingEnabled: false,
   teamBillingEnabled: false,
   signalBillingEnabled: false,
+  signalProduct: false,
   freeQuota: 5,
   proQuota: 100,
   signalQuota: 100,
@@ -48,6 +50,8 @@ export function initAuth() {
         auth.billingEnabled = Boolean(cfg?.billing_enabled)
         auth.teamBillingEnabled = Boolean(cfg?.team_billing_enabled)
         auth.signalBillingEnabled = Boolean(cfg?.signal_billing_enabled)
+        auth.signalProduct = Boolean(cfg?.signal_product)
+        applySiteConfig(cfg)
         if (cfg?.free_quota) auth.freeQuota = cfg.free_quota
         if (cfg?.pro_quota) auth.proQuota = cfg.pro_quota
         if (cfg?.signal_quota) auth.signalQuota = cfg.signal_quota
@@ -80,7 +84,12 @@ export async function continueAfterSignIn(plan, router) {
     await router.replace({ name: 'team-new' })
     return true
   }
-  const enabled = plan === 'pro' ? auth.billingEnabled : plan === 'signal' ? auth.signalBillingEnabled : false
+  const enabled =
+    plan === 'pro'
+      ? auth.billingEnabled
+      : plan === 'signal' && !auth.signalProduct
+        ? auth.signalBillingEnabled
+        : false
   if (!enabled || auth.me?.plan === plan) return false
   const res = await startCheckout(plan)
   if (res.url) {

@@ -131,7 +131,7 @@ function formatDate(s) {
         <h2>Publish from a coding agent</h2>
         <p class="muted">
           Add the MCP server to Cursor, Claude Code or any MCP client. Tools:
-          <code>create_page</code>, <code>get_page</code>, <code>update_page</code>, <code>delete_page</code>.
+          <code>create_page</code>, <code>get_page</code>, <code>create_draft</code>, <code>publish_draft</code>, <code>delete_page</code>.
         </p>
         <McpConnect :oauth="false" />
       </section>

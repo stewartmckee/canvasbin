@@ -9,7 +9,8 @@ import { site } from '../site.js'
 const route = useRoute()
 const router = useRouter()
 const next = safeNext(route.query.next)
-const plan = ['pro', 'team', ...(site.showSignal ? ['signal'] : [])].includes(route.query.plan) ? route.query.plan : ''
+const allowed = auth.signalProduct ? ['pro'] : ['pro', 'team']
+const plan = allowed.includes(route.query.plan) ? route.query.plan : ''
 const loginQuery = { ...(next !== '/' && { next }), ...(plan && { plan }) }
 const loginLink = { path: '/login', query: loginQuery }
 
@@ -53,17 +54,22 @@ async function submit() {
     <h1>
       {{
         plan === 'pro'
-          ? 'Start with Individual'
-          : plan === 'signal'
-            ? 'Start with Signal'
-            : plan === 'team'
-              ? 'Start a team'
+          ? auth.signalProduct
+            ? `Subscribe to ${site.name}`
+            : 'Start with Individual'
+          : plan === 'team'
+            ? 'Start a team'
+            : auth.signalProduct
+              ? 'Start your free trial'
               : 'Create an account'
       }}
     </h1>
-    <p v-if="plan === 'pro' || plan === 'signal'" class="notice">Create your account, then you'll go straight to secure checkout.</p>
+    <p v-if="plan === 'pro'" class="notice">Create your account, then you'll go straight to secure checkout.</p>
     <p v-else-if="plan === 'team'" class="notice">
       Create your account, then name your team. You'll verify your email before checkout.
+    </p>
+    <p v-else-if="auth.signalProduct" class="muted">
+      One site, email updates, and your AI assistant—verify your email, then create your page.
     </p>
     <p v-else class="muted">Keep your pages in a library, share them with a link and claim anonymous pages.</p>
     <p v-if="error" class="notice error">{{ error }}</p>
@@ -80,7 +86,17 @@ async function submit() {
         Password
         <input v-model="password" type="password" autocomplete="new-password" minlength="8" required />
       </label>
-      <button class="btn primary" type="submit" :disabled="busy">{{ busy ? 'Creating…' : plan === 'pro' || plan === 'signal' ? 'Continue to payment' : plan === 'team' ? 'Continue' : 'Create account' }}</button>
+      <button class="btn primary" type="submit" :disabled="busy">
+        {{
+          busy
+            ? 'Creating…'
+            : plan === 'pro'
+              ? 'Continue to payment'
+              : plan === 'team'
+                ? 'Continue'
+                : 'Create account'
+        }}
+      </button>
     </form>
     <p class="muted small">Already have an account? <RouterLink :to="loginLink">Sign in</RouterLink></p>
   </div>

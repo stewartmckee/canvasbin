@@ -68,6 +68,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/pages", s.create)
 	mux.HandleFunc("GET /api/pages/{key}", s.get)
 	mux.HandleFunc("PUT /api/pages/{key}", s.update)
+	mux.HandleFunc("POST /api/pages/{key}/draft", s.createDraft)
+	mux.HandleFunc("POST /api/pages/{key}/publish", s.publishDraft)
 	mux.HandleFunc("DELETE /api/pages/{key}", s.remove)
 	mux.HandleFunc("GET /api/pages/{key}/live", s.liveUpdates)
 	mux.HandleFunc("POST /api/render", s.preview)
@@ -124,16 +126,6 @@ func (s *Server) Handler() http.Handler {
 	return logRequests(s.commonHeaders(mux))
 }
 
-// marketingPaths are the public site pages search engines may index when
-// accounts are on. Everything else (pages, app screens, API) stays noindex.
-var marketingPaths = []string{
-	"/", "/features", "/pricing", "/privacy", "/terms", "/contact",
-	"/use-cases", "/use-cases/developers", "/use-cases/business", "/use-cases/family",
-	"/use-cases/news-apps-games",
-	"/connect", "/connect/claude", "/connect/chatgpt", "/connect/cursor",
-	"/agent-scratchpad", "/agent-scratchpad/share-context-across-platforms", "/agent-scratchpad/backup-ai-chats",
-}
-
 func (s *Server) indexable(r *http.Request) bool {
 	if !s.accounts() || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
 		return false
@@ -162,7 +154,16 @@ func (s *Server) sitemap(w http.ResponseWriter, r *http.Request) {
 		lastmod = "<lastmod>" + d + "</lastmod>"
 	}
 	for _, p := range marketingPaths {
-		fmt.Fprintf(&b, "  <url><loc>%s%s</loc>%s</url>\n", base, p, lastmod)
+		priority := "0.8"
+		changefreq := "monthly"
+		if p == "/" {
+			priority = "1.0"
+			changefreq = "weekly"
+		} else if strings.HasPrefix(p, "/use-cases/") || strings.HasPrefix(p, "/connect/") || strings.HasPrefix(p, "/agent-scratchpad/") {
+			changefreq = "monthly"
+		}
+		fmt.Fprintf(&b, "  <url><loc>%s%s</loc>%s<changefreq>%s</changefreq><priority>%s</priority></url>\n",
+			base, p, lastmod, changefreq, priority)
 	}
 	b.WriteString("</urlset>\n")
 	_, _ = w.Write([]byte(b.String()))
@@ -245,21 +246,42 @@ type pageInput struct {
 	Notify      *bool   `json:"notify,omitempty"`
 }
 
+type publishInput struct {
+	DraftID       int64 `json:"draft_id"`
+	ExpectedBytes int   `json:"expected_bytes"`
+	ConfirmShrink bool  `json:"confirm_shrink"`
+	Notify        *bool `json:"notify,omitempty"`
+}
+
 // publicConfig tells the web UI which optional features are available.
 func (s *Server) publicConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := map[string]any{
 		"accounts":        s.accounts(),
+		"public_url":      links.Base(s.Config.PublicBaseURL, r),
 		"billing_enabled": s.accounts() && s.Billing != nil && s.Billing.Enabled(),
 		"updates":         s.updatesOn(),
 		"updates_mode":    s.Config.UpdatesMode,
 		"product_name":    s.Config.ProductNameOrDefault(),
+		"product_type":    s.Config.ProductType,
+		"signal_product":  s.Config.SignalProduct(),
 	}
 	if s.accounts() {
-		cfg["free_quota"], cfg["pro_quota"] = s.Config.PlanQuotas()
-		cfg["team_quota"] = s.Config.TeamPageQuota()
-		cfg["team_billing_enabled"] = s.Billing != nil && s.Billing.TeamEnabled()
-		cfg["signal_billing_enabled"] = s.Billing != nil && s.Billing.SignalEnabled()
-		cfg["signal_quota"] = s.Config.SignalPageQuota()
+		reg := s.billingRegion(r)
+		s.stickBillingRegion(w, r, reg)
+		pr := s.Config.Pricing(reg)
+		cfg["billing_region"] = pr.Region
+		cfg["currency"] = pr.Currency
+		cfg["pricing"] = pr
+		if s.Config.SignalProduct() {
+			cfg["free_quota"] = config.SignalSiteQuota
+			cfg["pro_quota"] = config.SignalSiteQuota
+		} else {
+			cfg["free_quota"], cfg["pro_quota"] = s.Config.PlanQuotas()
+			cfg["team_quota"] = s.Config.TeamPageQuota()
+			cfg["team_billing_enabled"] = s.Billing != nil && s.Billing.TeamEnabled()
+			cfg["signal_billing_enabled"] = s.Billing != nil && s.Billing.SignalEnabled()
+			cfg["signal_quota"] = s.Config.SignalPageQuota()
+		}
 	}
 	writeJSON(w, http.StatusOK, cfg)
 }
@@ -287,6 +309,10 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	)
 	agentic := derefBool(in.AgenticOnly)
 	u := s.SessionUser(r)
+	if u != nil && in.TeamID != nil && !agentic && s.Config.SignalProduct() {
+		writeError(w, http.StatusForbidden, "this product allows one personal site per account; team pages are not available")
+		return
+	}
 	if u != nil && in.TeamID != nil && !agentic {
 		if err = s.checkTeamCreate(r, u, *in.TeamID); err != nil {
 			writeStoreError(w, err)
@@ -350,7 +376,20 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	changes := store.Changes{Title: in.Title, Format: in.Format, Content: in.Content, AgenticOnly: in.AgenticOnly}
+	// Content used to be written live. Old clients that still send it fail here
+	// and the page stays as it is. Title, format and agentic_only still apply.
+	if in.Content != nil {
+		if _, err := s.writable(r, key); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": "content is not published by this request; create a draft and publish it",
+			"code":  "draft_required",
+		})
+		return
+	}
+	changes := store.Changes{Title: in.Title, Format: in.Format, AgenticOnly: in.AgenticOnly}
 	var (
 		a   *store.Access
 		err error
@@ -367,10 +406,119 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, s.response(r, a))
+}
+
+func (s *Server) writable(r *http.Request, key string) (*store.Access, error) {
+	if u := s.SessionUser(r); u != nil {
+		a, err := s.Store.GetForUser(r.Context(), key, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !a.CanWrite {
+			return nil, store.ErrReadOnly
+		}
+		return a, nil
+	}
+	a, err := s.Store.Get(r.Context(), key)
+	if err != nil {
+		return nil, err
+	}
+	if !a.CanWrite {
+		return nil, store.ErrReadOnly
+	}
+	return a, nil
+}
+
+func (s *Server) createDraft(w http.ResponseWriter, r *http.Request) {
+	key, ok := pathKey(w, r)
+	if !ok {
+		return
+	}
+	var in pageInput
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Content == nil && in.Format == nil && in.Title == nil && in.AgenticOnly == nil {
+		writeError(w, http.StatusBadRequest, "nothing to draft: pass content, title, format or agentic_only")
+		return
+	}
+	var (
+		d   *store.Draft
+		err error
+	)
+	if u := s.SessionUser(r); u != nil {
+		d, err = s.Store.SaveDraftForUser(r.Context(), key, u.ID, in.Title, in.Format, in.Content, in.AgenticOnly)
+	} else {
+		d, err = s.Store.SaveDraft(r.Context(), key, in.Title, in.Format, in.Content, in.AgenticOnly)
+	}
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"draft_id":    d.ID,
+		"draft_bytes": d.DraftBytes,
+		"live_bytes":  d.LiveBytes,
+		"last_line":   store.LastNonEmptyLine(d.Content),
+		"live_url":    links.For(links.Base(s.PublicBaseURL, r), d.ReadKey, "").HTMLURL,
+		"published":   false,
+		"message":     "This draft is not published. The live page is unchanged. Publish only when expected_bytes equals the byte length of the source you meant to save.",
+	})
+}
+
+func (s *Server) publishDraft(w http.ResponseWriter, r *http.Request) {
+	key, ok := pathKey(w, r)
+	if !ok {
+		return
+	}
+	var in publishInput
+	if !decode(w, r, &in) {
+		return
+	}
+	var (
+		a   *store.Access
+		err error
+	)
+	if u := s.SessionUser(r); u != nil {
+		a, err = s.Store.PublishDraftForUser(r.Context(), key, u.ID, in.DraftID, in.ExpectedBytes, in.ConfirmShrink)
+		if err == nil {
+			s.logPage(r, u, a, store.ActivityPageEdited)
+		}
+	} else {
+		a, err = s.Store.PublishDraft(r.Context(), key, in.DraftID, in.ExpectedBytes, in.ConfirmShrink)
+	}
+	if err != nil {
+		if writePublishRefusal(w, err) {
+			return
+		}
+		writeStoreError(w, err)
+		return
+	}
 	if in.Notify != nil && *in.Notify {
 		s.NotifyPageEditSubscribers(r.Context(), a, true)
 	}
 	writeJSON(w, http.StatusOK, s.response(r, a))
+}
+
+func writePublishRefusal(w http.ResponseWriter, err error) bool {
+	var mismatch *store.PublishMismatch
+	if errors.As(err, &mismatch) {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error": mismatch.Error(), "code": "draft_length",
+			"draft_bytes": mismatch.DraftBytes, "expected_bytes": mismatch.ExpectedBytes, "live_bytes": mismatch.LiveBytes,
+		})
+		return true
+	}
+	var shrink *store.PublishShrink
+	if errors.As(err, &shrink) {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error": shrink.Error(), "code": "draft_shrink",
+			"draft_bytes": shrink.DraftBytes, "live_bytes": shrink.LiveBytes,
+		})
+		return true
+	}
+	return false
 }
 
 func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
@@ -673,7 +821,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 
 func writeStoreError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound), errors.Is(err, store.ErrDraftNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, store.ErrReadOnly):
 		writeError(w, http.StatusForbidden, err.Error())

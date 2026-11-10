@@ -340,8 +340,22 @@ func TestOAuthFlowEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	anonWriteKey := legacy.WriteKey
-	if st, _, body := f.mcp(access, rpcCall("update_page", `{"key":"`+anonWriteKey+`","content":"<p>v2</p>"}`)); st != 200 || strings.Contains(body, `"isError":true`) {
-		t.Fatalf("update of legacy page by key: %d %s", st, body)
+	if st, _, body := f.mcp(access, rpcCall("update_page", `{"key":"`+anonWriteKey+`","content":"<p>v2</p>"}`)); st != 200 || !strings.Contains(body, `"isError":true`) {
+		t.Fatalf("removed update_page should fail and leave the page: %d %s", st, body)
+	}
+	if got, err := e.st.Get(context.Background(), anonWriteKey); err != nil || got.Content != "<p>anon</p>" {
+		t.Fatalf("update_page wrote the page: %+v %v", got, err)
+	}
+	st, _, draftBody := f.mcp(access, rpcCall("create_draft", `{"key":"`+anonWriteKey+`","content":"<p>v2</p>"}`))
+	if st != 200 || strings.Contains(draftBody, `"isError":true`) || !strings.Contains(draftBody, "not published") {
+		t.Fatalf("create_draft: %d %s", st, draftBody)
+	}
+	id := regexp.MustCompile(`\\?"draft_id\\?":\s*(\d+)`).FindStringSubmatch(draftBody)
+	if id == nil {
+		t.Fatalf("no draft id in %s", draftBody)
+	}
+	if st, _, body := f.mcp(access, rpcCall("publish_draft", `{"key":"`+anonWriteKey+`","draft_id":`+id[1]+`,"expected_bytes":9}`)); st != 200 || strings.Contains(body, `"isError":true`) || !strings.Contains(body, `"published":true`) && !strings.Contains(body, `\"published\":true`) {
+		t.Fatalf("publish of legacy page by key: %d %s", st, body)
 	}
 
 	// With the bearer token: owned create, list, claim, share.

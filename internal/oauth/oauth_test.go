@@ -201,11 +201,22 @@ func TestParseClientDocument(t *testing.T) {
 		"bad redirect":  `{"client_id":"` + id + `","redirect_uris":["http://evil.example/cb"]}`,
 		"secret client": `{"client_id":"` + id + `","redirect_uris":["https://app.example/cb"],"token_endpoint_auth_method":"client_secret_basic"}`,
 		"has secret":    `{"client_id":"` + id + `","redirect_uris":["https://app.example/cb"],"client_secret":"x"}`,
+		"jwt only":      `{"client_id":"` + id + `","redirect_uris":["https://app.example/cb"],"token_endpoint_auth_method":"private_key_jwt","token_endpoint_auth_methods_supported":["private_key_jwt"]}`,
 		"not json":      `<html>`,
 	} {
 		if _, err := ParseClientDocument(id, []byte(doc)); err == nil {
 			t.Errorf("%s: should be rejected", name)
 		}
+	}
+	// ChatGPT prefers private_key_jwt and also advertises none. The intersection
+	// with this server is public-client PKCE.
+	chatgpt := `{"client_id":"` + id + `","client_name":"ChatGPT","redirect_uris":["https://chatgpt.com/connector/oauth/abc"],"token_endpoint_auth_method":"private_key_jwt","token_endpoint_auth_methods_supported":["none","private_key_jwt"]}`
+	c, err = ParseClientDocument(id, []byte(chatgpt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Name != "ChatGPT" || len(c.RedirectURIs) != 1 {
+		t.Fatalf("unexpected chatgpt client %+v", c)
 	}
 }
 

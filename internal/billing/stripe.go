@@ -17,6 +17,7 @@ import (
 	"github.com/stripe/stripe-go/v82/webhook"
 
 	"github.com/stewartmckee/canvasbin/internal/config"
+	"github.com/stewartmckee/canvasbin/internal/geo"
 	"github.com/stewartmckee/canvasbin/internal/store"
 )
 
@@ -49,15 +50,15 @@ func (s *Service) SignalEnabled() bool { return s.api != nil && s.cfg.StripePric
 var ErrUnknownPlan = errors.New("unknown plan")
 
 // priceFor returns the Stripe price for a personal plan.
-func (s *Service) priceFor(plan string) (string, error) {
+func (s *Service) priceFor(plan string, reg geo.Region) (string, error) {
 	switch plan {
 	case config.PlanPro, "":
-		if s.cfg.StripePricePro != "" {
-			return s.cfg.StripePricePro, nil
+		if id := s.cfg.ProPriceID(reg); id != "" {
+			return id, nil
 		}
 	case config.PlanSignal:
-		if s.cfg.StripePriceSignal != "" {
-			return s.cfg.StripePriceSignal, nil
+		if id := s.cfg.SignalPriceID(reg); id != "" {
+			return id, nil
 		}
 	default:
 		return "", ErrUnknownPlan
@@ -96,11 +97,11 @@ func (s *Service) EnsureCustomer(ctx context.Context, u *store.User) (string, er
 
 // CreateCheckoutSession starts a subscription checkout for a personal plan
 // (pro or signal).
-func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, plan, successURL, cancelURL string) (string, error) {
+func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, plan string, reg geo.Region, successURL, cancelURL string) (string, error) {
 	if s.api == nil {
 		return "", ErrNotConfigured
 	}
-	price, err := s.priceFor(plan)
+	price, err := s.priceFor(plan, reg)
 	if err != nil {
 		return "", err
 	}
@@ -133,11 +134,11 @@ func (s *Service) CreateCheckoutSession(ctx context.Context, u *store.User, plan
 
 // ChangePlan moves an existing personal subscription to another plan's price,
 // prorating the difference, and stores the result.
-func (s *Service) ChangePlan(ctx context.Context, u *store.User, plan string) error {
+func (s *Service) ChangePlan(ctx context.Context, u *store.User, plan string, reg geo.Region) error {
 	if s.api == nil {
 		return ErrNotConfigured
 	}
-	price, err := s.priceFor(plan)
+	price, err := s.priceFor(plan, reg)
 	if err != nil {
 		return err
 	}
@@ -220,7 +221,7 @@ func (s *Service) ensureTeamCustomer(ctx context.Context, t *store.Team, billTo 
 
 // CreateTeamCheckoutSession starts the team subscription: the flat base price
 // plus one seat per current member.
-func (s *Service) CreateTeamCheckoutSession(ctx context.Context, t *store.Team, billTo *store.User, seats int, successURL, cancelURL string) (string, error) {
+func (s *Service) CreateTeamCheckoutSession(ctx context.Context, t *store.Team, billTo *store.User, seats int, reg geo.Region, successURL, cancelURL string) (string, error) {
 	if !s.TeamEnabled() {
 		return "", ErrNotConfigured
 	}
@@ -239,8 +240,8 @@ func (s *Service) CreateTeamCheckoutSession(ctx context.Context, t *store.Team, 
 		SuccessURL:        stripe.String(successURL),
 		CancelURL:         stripe.String(cancelURL),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
-			{Price: stripe.String(s.cfg.StripePriceTeamBase), Quantity: stripe.Int64(1)},
-			{Price: stripe.String(s.cfg.StripePriceTeamSeat), Quantity: stripe.Int64(int64(seats))},
+			{Price: stripe.String(s.cfg.TeamBasePriceID(reg)), Quantity: stripe.Int64(1)},
+			{Price: stripe.String(s.cfg.TeamSeatPriceID(reg)), Quantity: stripe.Int64(int64(seats))},
 		},
 		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
 			Metadata: map[string]string{"canvasbin_team_id": tid},
@@ -297,7 +298,7 @@ func (s *Service) SyncTeamSeats(ctx context.Context, teamID int64) error {
 		seats = 1
 	}
 	for _, item := range sub.Items.Data {
-		if item.Price == nil || item.Price.ID != s.cfg.StripePriceTeamSeat {
+		if item.Price == nil || !s.cfg.IsTeamSeatPriceID(item.Price.ID) {
 			continue
 		}
 		if item.Quantity == seats {
@@ -313,9 +314,13 @@ func (s *Service) SyncTeamSeats(ctx context.Context, teamID int64) error {
 		}
 		return nil
 	}
+	reg := s.cfg.RegionForPriceID("")
+	if len(sub.Items.Data) > 0 && sub.Items.Data[0].Price != nil {
+		reg = s.cfg.RegionForPriceID(sub.Items.Data[0].Price.ID)
+	}
 	params := &stripe.SubscriptionItemParams{
 		Subscription:      stripe.String(sub.ID),
-		Price:             stripe.String(s.cfg.StripePriceTeamSeat),
+		Price:             stripe.String(s.cfg.TeamSeatPriceID(reg)),
 		Quantity:          stripe.Int64(seats),
 		ProrationBehavior: stripe.String("create_prorations"),
 	}
