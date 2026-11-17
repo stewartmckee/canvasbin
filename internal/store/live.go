@@ -68,7 +68,7 @@ func (s *Store) listen(ctx context.Context, fn func(PageChange), connected func(
 }
 
 // notifyPageSQL builds the page_changed payload for a pages row aliased p. The
-// trigger only fires for title, format and content changes, so anything else
+// trigger only fires for title, description, format and content changes, so anything else
 // that changes the rendered page (such as its updates) has to notify itself.
 const notifyPageSQL = `pg_notify('page_changed', json_build_object('id', p.id, 'updated_at', p.updated_at)::text)`
 

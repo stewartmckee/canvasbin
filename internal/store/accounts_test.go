@@ -149,7 +149,7 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 	st, ctx := testStore(t), context.Background()
 	owner, other := newUser(t, st, "owner"), newUser(t, st, "other")
 
-	a, err := st.CreateOwned(ctx, owner.ID, "Mine", "markdown", "# hi", false)
+	a, err := st.CreateOwned(ctx, owner.ID, "Mine", "markdown", "# hi", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestOwnedPagesClaimAndShares(t *testing.T) {
 func TestClaim(t *testing.T) {
 	st, ctx := testStore(t), context.Background()
 	u1, u2 := newUser(t, st, "c1"), newUser(t, st, "c2")
-	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>", false)
+	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,11 +364,11 @@ func TestOAuthStore(t *testing.T) {
 func TestAgenticOnlyPages(t *testing.T) {
 	st, ctx := testStore(t), context.Background()
 	u := newUser(t, st, "agentic")
-	normal, err := st.CreateOwned(ctx, u.ID, "Visible", "html", "<p>hi</p>", false)
+	normal, err := st.CreateOwned(ctx, u.ID, "Visible", "html", "<p>hi</p>", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	scratch, err := st.CreateOwned(ctx, u.ID, "Scratch", "markdown", "# notes", true)
+	scratch, err := st.CreateOwned(ctx, u.ID, "Scratch", "markdown", "# notes", true, "")
 	if err != nil {
 		t.Fatal(err)
 	}

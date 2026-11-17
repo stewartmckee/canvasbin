@@ -26,8 +26,9 @@ const (
 	FormatHTML     = "html"
 	FormatMarkdown = "markdown"
 
-	MaxContentBytes = 1 << 20
-	MaxTitleRunes   = 200
+	MaxContentBytes     = 1 << 20
+	MaxTitleRunes       = 200
+	MaxDescriptionRunes = 300
 )
 
 var (
@@ -54,6 +55,7 @@ type Page struct {
 	OwnerID     *int64    `json:"-"`
 	TeamID      *int64    `json:"-"`
 	Title       string    `json:"title"`
+	Description string    `json:"description"`
 	Format      string    `json:"format"`
 	Content     string    `json:"content"`
 	AgenticOnly bool      `json:"agentic_only"`
@@ -82,6 +84,7 @@ type Access struct {
 // the live page unchanged.
 type Changes struct {
 	Title         *string
+	Description   *string
 	Format        *string
 	Content       *string
 	AgenticOnly   *bool
@@ -136,30 +139,37 @@ func NormalizeFormat(f string) (string, error) {
 }
 
 func cleanTitle(t string) string {
-	t = strings.TrimSpace(t)
-	if utf8.RuneCountInString(t) > MaxTitleRunes {
-		t = string([]rune(t)[:MaxTitleRunes])
+	return clipRunes(strings.TrimSpace(t), MaxTitleRunes)
+}
+
+func cleanDescription(t string) string {
+	return clipRunes(strings.Join(strings.Fields(t), " "), MaxDescriptionRunes)
+}
+
+func clipRunes(t string, n int) string {
+	if utf8.RuneCountInString(t) > n {
+		return string([]rune(t)[:n])
 	}
 	return t
 }
 
-func (s *Store) Create(ctx context.Context, title, format, content string, agenticOnly bool) (*Access, error) {
-	return s.create(ctx, nil, nil, title, format, content, agenticOnly)
+func (s *Store) Create(ctx context.Context, title, format, content string, agenticOnly bool, description string) (*Access, error) {
+	return s.create(ctx, nil, nil, title, description, format, content, agenticOnly)
 }
 
 // CreateOwned creates a page owned by userID. The read key is retained on the
 // row (see schema) so the owner's library can link to the page.
-func (s *Store) CreateOwned(ctx context.Context, ownerID int64, title, format, content string, agenticOnly bool) (*Access, error) {
-	return s.create(ctx, &ownerID, nil, title, format, content, agenticOnly)
+func (s *Store) CreateOwned(ctx context.Context, ownerID int64, title, format, content string, agenticOnly bool, description string) (*Access, error) {
+	return s.create(ctx, &ownerID, nil, title, description, format, content, agenticOnly)
 }
 
 // CreateInTeam creates a team page with userID as its creator. Callers check
 // membership, subscription and quota first.
-func (s *Store) CreateInTeam(ctx context.Context, userID, teamID int64, title, format, content string, agenticOnly bool) (*Access, error) {
-	return s.create(ctx, &userID, &teamID, title, format, content, agenticOnly)
+func (s *Store) CreateInTeam(ctx context.Context, userID, teamID int64, title, format, content string, agenticOnly bool, description string) (*Access, error) {
+	return s.create(ctx, &userID, &teamID, title, description, format, content, agenticOnly)
 }
 
-func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, format, content string, agenticOnly bool) (*Access, error) {
+func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, description, format, content string, agenticOnly bool) (*Access, error) {
 	if agenticOnly {
 		teamID = nil
 	}
@@ -176,16 +186,16 @@ func (s *Store) create(ctx context.Context, ownerID, teamID *int64, title, forma
 	}
 	readKey := keys.ReadFromWrite(writeKey)
 	a := &Access{CanWrite: true, ReadKey: readKey, WriteKey: writeKey}
-	a.Title, a.Format, a.Content, a.OwnerID, a.TeamID, a.AgenticOnly = cleanTitle(title), format, content, ownerID, teamID, agenticOnly
+	a.Title, a.Description, a.Format, a.Content, a.OwnerID, a.TeamID, a.AgenticOnly = cleanTitle(title), cleanDescription(description), format, content, ownerID, teamID, agenticOnly
 	var storedReadKey *string
 	if ownerID != nil {
 		storedReadKey = &readKey
 		a.Role = RoleOwner
 	}
 	err = s.db.QueryRow(ctx,
-		`INSERT INTO pages (title, format, content, read_key_hash, write_key_hash, owner_id, read_key, team_id, agentic_only)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at, updated_at`,
-		a.Title, a.Format, a.Content, keys.Hash(readKey), keys.Hash(writeKey), ownerID, storedReadKey, teamID, agenticOnly,
+		`INSERT INTO pages (title, description, format, content, read_key_hash, write_key_hash, owner_id, read_key, team_id, agentic_only)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, created_at, updated_at`,
+		a.Title, a.Description, a.Format, a.Content, keys.Hash(readKey), keys.Hash(writeKey), ownerID, storedReadKey, teamID, agenticOnly,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -199,9 +209,9 @@ func (s *Store) Get(ctx context.Context, key string) (*Access, error) {
 	var a Access
 	var noReadKey bool
 	err := s.db.QueryRow(ctx,
-		`SELECT id, owner_id, team_id, title, format, content, agentic_only, created_at, updated_at, write_key_hash = $1, read_key IS NULL
+		`SELECT id, owner_id, team_id, title, description, format, content, agentic_only, created_at, updated_at, write_key_hash = $1, read_key IS NULL
 		 FROM pages WHERE read_key_hash = $1 OR write_key_hash = $1`, h,
-	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt, &a.CanWrite, &noReadKey)
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Description, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt, &a.CanWrite, &noReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -248,17 +258,22 @@ func (s *Store) Update(ctx context.Context, writeKey string, c Changes) (*Access
 		t := cleanTitle(*c.Title)
 		c.Title = &t
 	}
+	if c.Description != nil {
+		d := cleanDescription(*c.Description)
+		c.Description = &d
+	}
 	clearTeam := c.AgenticOnly != nil && *c.AgenticOnly
 	tag, err := s.db.Exec(ctx,
 		`UPDATE pages SET
 		   title = COALESCE($2, title),
-		   format = COALESCE($3, format),
-		   content = COALESCE($4, content),
-		   agentic_only = COALESCE($5, agentic_only),
-		   team_id = CASE WHEN $6 THEN NULL ELSE team_id END,
+		   description = COALESCE($3, description),
+		   format = COALESCE($4, format),
+		   content = COALESCE($5, content),
+		   agentic_only = COALESCE($6, agentic_only),
+		   team_id = CASE WHEN $7 THEN NULL ELSE team_id END,
 		   updated_at = now()
 		 WHERE write_key_hash = $1`,
-		keys.Hash(writeKey), c.Title, c.Format, c.Content, c.AgenticOnly, clearTeam)
+		keys.Hash(writeKey), c.Title, c.Description, c.Format, c.Content, c.AgenticOnly, clearTeam)
 	if err != nil {
 		return nil, err
 	}

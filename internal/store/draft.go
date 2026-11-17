@@ -38,6 +38,7 @@ type Draft struct {
 	ID          int64
 	Content     string
 	Title       *string
+	Description *string
 	Format      *string
 	AgenticOnly *bool
 	DraftBytes  int
@@ -62,7 +63,7 @@ func checkPublishLength(live, next string, expected *int, confirm bool) error {
 
 // SaveDraft stores one draft for a page the write key can edit. The live page,
 // its URL and its updated_at are not changed.
-func (s *Store) SaveDraft(ctx context.Context, writeKey string, title, format, content *string, agentic *bool) (*Draft, error) {
+func (s *Store) SaveDraft(ctx context.Context, writeKey string, title, description, format, content *string, agentic *bool) (*Draft, error) {
 	a, err := s.Get(ctx, writeKey)
 	if err != nil {
 		return nil, err
@@ -70,11 +71,11 @@ func (s *Store) SaveDraft(ctx context.Context, writeKey string, title, format, c
 	if !a.CanWrite {
 		return nil, ErrReadOnly
 	}
-	return s.saveDraft(ctx, a, title, format, content, agentic)
+	return s.saveDraft(ctx, a, title, description, format, content, agentic)
 }
 
 // SaveDraftForUser stores one draft when the user may write the page.
-func (s *Store) SaveDraftForUser(ctx context.Context, key string, userID int64, title, format, content *string, agentic *bool) (*Draft, error) {
+func (s *Store) SaveDraftForUser(ctx context.Context, key string, userID int64, title, description, format, content *string, agentic *bool) (*Draft, error) {
 	a, err := s.GetForUser(ctx, key, userID)
 	if err != nil {
 		return nil, err
@@ -82,10 +83,10 @@ func (s *Store) SaveDraftForUser(ctx context.Context, key string, userID int64, 
 	if !a.CanWrite {
 		return nil, ErrReadOnly
 	}
-	return s.saveDraft(ctx, a, title, format, content, agentic)
+	return s.saveDraft(ctx, a, title, description, format, content, agentic)
 }
 
-func (s *Store) saveDraft(ctx context.Context, a *Access, title, format, content *string, agentic *bool) (*Draft, error) {
+func (s *Store) saveDraft(ctx context.Context, a *Access, title, description, format, content *string, agentic *bool) (*Draft, error) {
 	if format != nil {
 		f, err := NormalizeFormat(*format)
 		if err != nil {
@@ -96,6 +97,10 @@ func (s *Store) saveDraft(ctx context.Context, a *Access, title, format, content
 	if title != nil {
 		t := cleanTitle(*title)
 		title = &t
+	}
+	if description != nil {
+		d := cleanDescription(*description)
+		description = &d
 	}
 	body := a.Content
 	if content != nil {
@@ -114,9 +119,9 @@ func (s *Store) saveDraft(ctx context.Context, a *Access, title, format, content
 	}
 	var id int64
 	err = tx.QueryRow(ctx,
-		`INSERT INTO page_drafts (page_id, title, format, content, agentic_only)
-		 VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		a.ID, title, format, body, agentic,
+		`INSERT INTO page_drafts (page_id, title, description, format, content, agentic_only)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+		a.ID, title, description, format, body, agentic,
 	).Scan(&id)
 	if err != nil {
 		return nil, err
@@ -125,7 +130,7 @@ func (s *Store) saveDraft(ctx context.Context, a *Access, title, format, content
 		return nil, err
 	}
 	return &Draft{
-		ID: id, Content: body, Title: title, Format: format, AgenticOnly: agentic,
+		ID: id, Content: body, Title: title, Description: description, Format: format, AgenticOnly: agentic,
 		DraftBytes: len(body), LiveBytes: len(a.Content), ReadKey: a.ReadKey,
 	}, nil
 }
@@ -164,12 +169,12 @@ func (s *Store) PublishDraftForUser(ctx context.Context, key string, userID, dra
 
 func (s *Store) applyDraft(ctx context.Context, pageID, draftID int64, expected int, confirm bool) error {
 	var d Draft
-	var title, format sql.NullString
+	var title, description, format sql.NullString
 	var agentic sql.NullBool
 	err := s.db.QueryRow(ctx,
-		`SELECT id, title, format, content, agentic_only FROM page_drafts WHERE page_id = $1 AND id = $2`,
+		`SELECT id, title, description, format, content, agentic_only FROM page_drafts WHERE page_id = $1 AND id = $2`,
 		pageID, draftID,
-	).Scan(&d.ID, &title, &format, &d.Content, &agentic)
+	).Scan(&d.ID, &title, &description, &format, &d.Content, &agentic)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrDraftNotFound
 	}
@@ -179,6 +184,9 @@ func (s *Store) applyDraft(ctx context.Context, pageID, draftID int64, expected 
 	if title.Valid {
 		d.Title = &title.String
 	}
+	if description.Valid {
+		d.Description = &description.String
+	}
 	if format.Valid {
 		d.Format = &format.String
 	}
@@ -187,7 +195,7 @@ func (s *Store) applyDraft(ctx context.Context, pageID, draftID int64, expected 
 	}
 	expectedBytes := expected
 	if err := s.UpdateByID(ctx, pageID, Changes{
-		Title: d.Title, Format: d.Format, Content: &d.Content, AgenticOnly: d.AgenticOnly,
+		Title: d.Title, Description: d.Description, Format: d.Format, Content: &d.Content, AgenticOnly: d.AgenticOnly,
 		ExpectedBytes: &expectedBytes, ConfirmShrink: confirm,
 	}); err != nil {
 		return err

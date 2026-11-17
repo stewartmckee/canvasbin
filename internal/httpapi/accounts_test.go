@@ -354,7 +354,7 @@ func TestOwnedPagesQuotaAndSharing(t *testing.T) {
 	anon.want(401, "POST", "/api/pages", map[string]string{"content": "anon"})
 
 	// Claim a pre-accounts anonymous page with its write key.
-	legacy, err := e.st.Create(context.Background(), "", "html", "anon", false)
+	legacy, err := e.st.Create(context.Background(), "", "html", "anon", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}

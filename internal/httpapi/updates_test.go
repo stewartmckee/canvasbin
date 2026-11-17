@@ -92,14 +92,14 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 		return res.StatusCode
 	}
 
-	pro, err := st.CreateOwned(ctx, owner("price_pro"), "Pro", "html", "<p>x</p>", false)
+	pro, err := st.CreateOwned(ctx, owner("price_pro"), "Pro", "html", "<p>x</p>", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if code := enable(pro.WriteKey); code != http.StatusPaymentRequired {
 		t.Fatalf("individual owner enabling updates: status %d, want 402", code)
 	}
-	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>", false)
+	anon, err := st.Create(ctx, "Anon", "html", "<p>x</p>", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestUpdatesSubscribeAndPost(t *testing.T) {
 		t.Fatalf("anonymous page enabling updates: status %d, want 402", code)
 	}
 
-	a, err := st.CreateOwned(ctx, owner("price_signal"), "Site", "html", "<p>x</p>", false)
+	a, err := st.CreateOwned(ctx, owner("price_signal"), "Site", "html", "<p>x</p>", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}

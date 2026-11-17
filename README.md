@@ -378,7 +378,7 @@ url = "https://{your-canvas-bin-host}/mcp"
 
 - `create_page` — publish HTML or Markdown. Returns `html_url`, `pdf_url`, `read_url`, `write_url`, and the keys. When publishing into a team, the agent is asked to read that team's style guide first.
 - `get_page` — read a page by read key, write key, or URL.
-- `create_draft` — store one unpublished draft (content, and title or format when those change). Needs the write key. Does not change the live page.
+- `create_draft` — store one unpublished draft (content, and title, description or format when those change). Needs the write key. Does not change the live page. Title and description are what other apps show when the link is pasted.
 - `publish_draft` — copy that draft onto the live page when `expected_bytes` matches the stored draft. A draft under half the live page also needs `confirm_shrink`.
 - `delete_page` — delete a page. Needs the write key.
 - `get_style_guide` / `set_style_guide` — read, create, or update a team's style guide. These are registered only when accounts are on. Any member of that team can create the guide or replace it later. `create_page` tells the agent to call `get_style_guide` before writing a team page.

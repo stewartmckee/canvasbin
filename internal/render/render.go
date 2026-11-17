@@ -112,10 +112,14 @@ func wrap(title, css, body string) string {
 `
 }
 
-const fragmentCSS = `body{margin:0 auto;max-width:960px;padding:2rem 1.25rem;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55;color:#1f2328}
-img,video{max-width:100%;height:auto}
-table{border-collapse:collapse}td,th{border:1px solid #d0d7de;padding:.35rem .6rem}
-pre{overflow:auto;background:#f6f8fa;padding:.8rem;border-radius:6px}`
+// fragmentCSS is the shell for HTML that is not already a full document.
+// It only resets the browser margin and sets a system font. Column width,
+// alignment, colour, and component styles belong in the page, where a later
+// rule of the same specificity replaces these. A team's style guide is
+// writing guidance for the author; it is not CSS and is not injected here.
+const fragmentCSS = `*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}`
 
 const markdownCSS = `body{margin:0;background:#fff;color:#1f2328;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .markdown-body{max-width:860px;margin:0 auto;padding:2.5rem 1.25rem 4rem;line-height:1.6;font-size:16px}

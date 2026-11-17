@@ -119,7 +119,7 @@ func (s *Server) Handler() http.Handler {
 		case ".pdf":
 			s.pdfDownload(w, r, key)
 		default:
-			s.serveIndex(w, r)
+			s.servePageApp(w, r, key)
 		}
 	})
 	mux.Handle("/", spa)
@@ -239,6 +239,7 @@ func (s *Server) response(r *http.Request, a *store.Access) pageResponse {
 
 type pageInput struct {
 	Title       *string `json:"title"`
+	Description *string `json:"description"`
 	Format      *string `json:"format"`
 	Content     *string `json:"content"`
 	TeamID      *int64  `json:"team_id"`
@@ -318,7 +319,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 			writeStoreError(w, err)
 			return
 		}
-		a, err = s.Store.CreateInTeam(r.Context(), u.ID, *in.TeamID, deref(in.Title), deref(in.Format), deref(in.Content), false)
+		a, err = s.Store.CreateInTeam(r.Context(), u.ID, *in.TeamID, deref(in.Title), deref(in.Format), deref(in.Content), false, deref(in.Description))
 		if err == nil {
 			a, err = s.Store.GetForUser(r.Context(), a.WriteKey, u.ID)
 			s.logPage(r, u, a, store.ActivityPageCreated)
@@ -328,12 +329,12 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 			writeStoreError(w, err)
 			return
 		}
-		a, err = s.Store.CreateOwned(r.Context(), u.ID, deref(in.Title), deref(in.Format), deref(in.Content), agentic)
+		a, err = s.Store.CreateOwned(r.Context(), u.ID, deref(in.Title), deref(in.Format), deref(in.Content), agentic, deref(in.Description))
 	} else if s.accounts() {
 		writeError(w, http.StatusUnauthorized, "sign in to create pages")
 		return
 	} else {
-		a, err = s.Store.Create(r.Context(), deref(in.Title), deref(in.Format), deref(in.Content), agentic)
+		a, err = s.Store.Create(r.Context(), deref(in.Title), deref(in.Format), deref(in.Content), agentic, deref(in.Description))
 	}
 	if err != nil {
 		writeStoreError(w, err)
@@ -389,7 +390,7 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	changes := store.Changes{Title: in.Title, Format: in.Format, AgenticOnly: in.AgenticOnly}
+	changes := store.Changes{Title: in.Title, Description: in.Description, Format: in.Format, AgenticOnly: in.AgenticOnly}
 	var (
 		a   *store.Access
 		err error
@@ -439,8 +440,8 @@ func (s *Server) createDraft(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.Content == nil && in.Format == nil && in.Title == nil && in.AgenticOnly == nil {
-		writeError(w, http.StatusBadRequest, "nothing to draft: pass content, title, format or agentic_only")
+	if in.Content == nil && in.Format == nil && in.Title == nil && in.Description == nil && in.AgenticOnly == nil {
+		writeError(w, http.StatusBadRequest, "nothing to draft: pass content, title, description, format or agentic_only")
 		return
 	}
 	var (
@@ -448,9 +449,9 @@ func (s *Server) createDraft(w http.ResponseWriter, r *http.Request) {
 		err error
 	)
 	if u := s.SessionUser(r); u != nil {
-		d, err = s.Store.SaveDraftForUser(r.Context(), key, u.ID, in.Title, in.Format, in.Content, in.AgenticOnly)
+		d, err = s.Store.SaveDraftForUser(r.Context(), key, u.ID, in.Title, in.Description, in.Format, in.Content, in.AgenticOnly)
 	} else {
-		d, err = s.Store.SaveDraft(r.Context(), key, in.Title, in.Format, in.Content, in.AgenticOnly)
+		d, err = s.Store.SaveDraft(r.Context(), key, in.Title, in.Description, in.Format, in.Content, in.AgenticOnly)
 	}
 	if err != nil {
 		writeStoreError(w, err)
@@ -554,11 +555,17 @@ func (s *Server) preview(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	doc, err := render.Document(store.Page{Title: deref(in.Title), Format: format, Content: deref(in.Content)})
+	page := store.Page{Title: deref(in.Title), Description: deref(in.Description), Format: format, Content: deref(in.Content)}
+	doc, err := render.Document(page)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not render page")
 		return
 	}
+	doc = render.ApplyLinkPreview(doc, render.LinkPreview{
+		Title:       render.PreviewTitle(page.Title, page.Format, page.Content),
+		Description: render.PreviewDescription(page.Description, page.Content),
+		SiteName:    s.Config.ProductNameOrDefault(),
+	})
 	writeJSON(w, http.StatusOK, map[string]string{"html": doc})
 }
 
@@ -583,6 +590,7 @@ func (s *Server) view(w http.ResponseWriter, r *http.Request, key string) {
 		doc = render.WithLiveReload(doc, a.ReadKey, liveTime(a.UpdatedAt))
 	}
 	doc = s.injectUpdates(r.Context(), doc, a)
+	doc = render.ApplyLinkPreview(doc, s.linkPreview(r, a))
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Content-Security-Policy", viewCSP)
@@ -761,6 +769,31 @@ func isAppPath(p string) bool {
 
 func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 	s.writeIndex(w, r, http.StatusOK)
+}
+
+// servePageApp is the editor shell for /{key}. Crawlers that build a link card
+// do not run the app, so the shell's head carries this page's title and description.
+func (s *Server) servePageApp(w http.ResponseWriter, r *http.Request, key string) {
+	index, err := fs.ReadFile(s.Web, "index.html")
+	if err != nil {
+		http.Error(w, "web UI not built", http.StatusNotFound)
+		return
+	}
+	if a, err := s.Store.Get(r.Context(), key); err == nil {
+		index = []byte(render.ApplyLinkPreview(string(index), s.linkPreview(r, a)))
+	} else if !errors.Is(err, store.ErrNotFound) {
+		slog.Error("link preview", "err", err)
+	}
+	writeHTML(w, http.StatusOK, index)
+}
+
+func (s *Server) linkPreview(r *http.Request, a *store.Access) render.LinkPreview {
+	return render.LinkPreview{
+		Title:       render.PreviewTitle(a.Title, a.Format, a.Content),
+		Description: render.PreviewDescription(a.Description, a.Content),
+		URL:         links.Base(s.PublicBaseURL, r) + r.URL.Path,
+		SiteName:    s.Config.ProductNameOrDefault(),
+	}
 }
 
 func (s *Server) writeIndex(w http.ResponseWriter, r *http.Request, status int) {

@@ -39,14 +39,14 @@ func (s *Store) GetForUser(ctx context.Context, key string, userID int64) (*Acce
 		noReadKey  bool
 	)
 	err := s.db.QueryRow(ctx,
-		`SELECT p.id, p.owner_id, p.team_id, p.title, p.format, p.content, p.agentic_only, p.created_at, p.updated_at,
+		`SELECT p.id, p.owner_id, p.team_id, p.title, p.description, p.format, p.content, p.agentic_only, p.created_at, p.updated_at,
 		        p.write_key_hash = $1, s.role, tm.role, COALESCE(t.name, ''), p.read_key IS NULL
 		 FROM pages p
 		 LEFT JOIN page_shares s ON s.page_id = p.id AND s.user_id = $2
 		 LEFT JOIN team_members tm ON tm.team_id = p.team_id AND tm.user_id = $2
 		 LEFT JOIN teams t ON t.id = p.team_id
 		 WHERE p.read_key_hash = $1 OR p.write_key_hash = $1`, h, userID,
-	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt,
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Description, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt,
 		&isWriteKey, &role, &teamRole, &a.TeamName, &noReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -106,9 +106,9 @@ func (s *Store) backfillReadKey(ctx context.Context, a *Access) {
 func (s *Store) GetByID(ctx context.Context, id int64) (*Access, error) {
 	var a Access
 	err := s.db.QueryRow(ctx,
-		`SELECT id, owner_id, team_id, title, format, content, agentic_only, created_at, updated_at, COALESCE(read_key, '')
+		`SELECT id, owner_id, team_id, title, description, format, content, agentic_only, created_at, updated_at, COALESCE(read_key, '')
 		 FROM pages WHERE id = $1`, id,
-	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt, &a.ReadKey)
+	).Scan(&a.ID, &a.OwnerID, &a.TeamID, &a.Title, &a.Description, &a.Format, &a.Content, &a.AgenticOnly, &a.CreatedAt, &a.UpdatedAt, &a.ReadKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -178,16 +178,21 @@ func (s *Store) UpdateByID(ctx context.Context, id int64, c Changes) error {
 		t := cleanTitle(*c.Title)
 		c.Title = &t
 	}
+	if c.Description != nil {
+		d := cleanDescription(*c.Description)
+		c.Description = &d
+	}
 	clearTeam := c.AgenticOnly != nil && *c.AgenticOnly
 	tag, err := s.db.Exec(ctx,
 		`UPDATE pages SET
 		   title = COALESCE($2, title),
-		   format = COALESCE($3, format),
-		   content = COALESCE($4, content),
-		   agentic_only = COALESCE($5, agentic_only),
-		   team_id = CASE WHEN $6 THEN NULL ELSE team_id END,
+		   description = COALESCE($3, description),
+		   format = COALESCE($4, format),
+		   content = COALESCE($5, content),
+		   agentic_only = COALESCE($6, agentic_only),
+		   team_id = CASE WHEN $7 THEN NULL ELSE team_id END,
 		   updated_at = now()
-		 WHERE id = $1`, id, c.Title, c.Format, c.Content, c.AgenticOnly, clearTeam)
+		 WHERE id = $1`, id, c.Title, c.Description, c.Format, c.Content, c.AgenticOnly, clearTeam)
 	if err != nil {
 		return err
 	}

@@ -17,6 +17,8 @@ ALTER TABLE pages ADD COLUMN IF NOT EXISTS owner_id bigint;
 -- read key is a read-only bearer link, so retaining it is a deliberate tradeoff.
 ALTER TABLE pages ADD COLUMN IF NOT EXISTS read_key text;
 ALTER TABLE pages ADD COLUMN IF NOT EXISTS agentic_only boolean NOT NULL DEFAULT false;
+-- Shown in link previews (Slack, iMessage, and similar) with the title.
+ALTER TABLE pages ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT '';
 
 -- One unpublished draft per page. Replacing it does not touch the live row.
 CREATE TABLE IF NOT EXISTS page_drafts (
@@ -26,8 +28,11 @@ CREATE TABLE IF NOT EXISTS page_drafts (
     format       text,
     content      text        NOT NULL,
     agentic_only boolean,
+    description  text,
     created_at   timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE page_drafts ADD COLUMN IF NOT EXISTS description text;
 
 CREATE TABLE IF NOT EXISTS users (
     id                     bigserial PRIMARY KEY,
@@ -217,6 +222,7 @@ BEGIN
         RETURN OLD;
     END IF;
     IF NEW.title IS DISTINCT FROM OLD.title
+       OR NEW.description IS DISTINCT FROM OLD.description
        OR NEW.format IS DISTINCT FROM OLD.format
        OR NEW.content IS DISTINCT FROM OLD.content THEN
         PERFORM pg_notify('page_changed', json_build_object('id', NEW.id, 'updated_at', NEW.updated_at)::text);

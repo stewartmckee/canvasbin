@@ -20,6 +20,15 @@ func TestFragmentIsWrapped(t *testing.T) {
 	if !strings.Contains(got, "<title>A &lt;b&gt;</title>") || !strings.Contains(got, "<p>hi</p>") {
 		t.Fatalf("unexpected wrap: %s", got)
 	}
+	style := got[strings.Index(got, "<style>")+len("<style>") : strings.Index(got, "</style>")]
+	for _, banned := range []string{"max-width", "960", "margin:0 auto", "border-collapse", "#1f2328", "#f6f8fa"} {
+		if strings.Contains(style, banned) {
+			t.Errorf("fragment shell should not impose %q:\n%s", banned, style)
+		}
+	}
+	if !strings.Contains(style, "margin:0") || !strings.Contains(style, "box-sizing:border-box") {
+		t.Fatalf("fragment shell should be a reset, got:\n%s", style)
+	}
 }
 
 func TestMarkdown(t *testing.T) {

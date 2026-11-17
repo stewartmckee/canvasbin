@@ -30,7 +30,9 @@ A page URL's extension picks the view: /{key} opens the Canvasbin app, /{key}.ht
 - read_url: the app in read-only mode (preview and source).
 - write_url: the browser editor. The key in it grants edit and delete, so share it only with collaborators.
 
-You do not need the browser to make changes: call create_draft and then publish_draft, or delete_page, with the write key (or write_url) directly. Keep write_key if you will update the page later. Tools that take a "key" accept the bare key or any Canvasbin URL. HTML pages may be a fragment or a full document with <html>; scripts run in a sandbox.
+You do not need the browser to make changes: call create_draft and then publish_draft, or delete_page, with the write key (or write_url) directly. Keep write_key if you will update the page later. Tools that take a "key" accept the bare key or any Canvasbin URL. HTML pages may be a fragment or a full document with <html>. A fragment is wrapped in a blank document: no column, colours, or component styles, so layout and visual CSS belong in the page. A full document's body is served as written. Scripts run in a sandbox. The page title and description are added to the document head for the browser tab and for link previews.
+
+Set title to the page's name and description to one or two sentences about it. Chat apps show those when someone pastes the link. Pass both on create_page, and pass either again on create_draft when it should change.
 
 create_page writes a new page in one call. Changing a page is two calls: create_draft stores one unpublished draft and leaves the live page untouched, then publish_draft copies that draft onto the live page.
 
@@ -124,7 +126,7 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	t := &tools{Options: o, base: base, clientIP: clientIP, user: user}
 
 	createDesc := "Publish a new HTML or Markdown page. Returns html_url (rendered, view-only), pdf_url, read_url (read-only app view) and write_url (browser editor), plus the keys."
-	draftDesc := "Store one unpublished draft of an existing page. Takes the write key and the same body as a page edit: content, and title or format when those are changing. A second create_draft replaces the unpublished draft. Does not change the live HTML, the public URL, or the live page's updated_at, and does not email subscribers. The result is metrics only: compare draft_bytes with the byte length of the source you meant to save before calling publish_draft. Copying draft_bytes into expected_bytes would confirm a short or truncated draft."
+	draftDesc := "Store one unpublished draft of an existing page. Takes the write key and the same body as a page edit: content, and title, description or format when those are changing. Title and description are what chat apps show when the link is pasted. A second create_draft replaces the unpublished draft. Does not change the live HTML, the public URL, or the live page's updated_at, and does not email subscribers. The result is metrics only: compare draft_bytes with the byte length of the source you meant to save before calling publish_draft. Copying draft_bytes into expected_bytes would confirm a short or truncated draft."
 	publishDesc := "Copy a draft onto the live page. expected_bytes is the byte length of the source you meant to save: count it from that source, compare it with draft_bytes, and pass that count. Do not copy draft_bytes into expected_bytes. If the two differ, nothing is published and both numbers are returned. If the draft is under half the live page, the call is refused unless confirm_shrink is true, which is only for a deliberate shorter rewrite. Subscriber mail is sent from this call when notify is true."
 	if o.Config.Accounts && !o.Config.SignalProduct() {
 		createDesc += " When the page is for a team, call get_style_guide for that team before you write it, and follow the style guide when one is set. Style guides are a Team plan feature; if the guide is empty or the plan is not active, write the page as usual."
@@ -144,7 +146,7 @@ func newServer(o Options, base, clientIP string, user *store.User) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "get_page",
 		Title:       "Get page",
-		Description: "Fetch a page's title, format and source content using its read key, write key, or either URL.",
+		Description: "Fetch a page's title, description, format and source content using its read key, write key, or either URL.",
 		Annotations: readTool(),
 	}, t.get)
 	mcp.AddTool(s, &mcp.Tool{
@@ -178,7 +180,8 @@ const gzippedContentNote = " To keep the tool call small, gzip the UTF-8 page so
 type CreateInput struct {
 	Content     string `json:"content" jsonschema:"page source: HTML (fragment or full document) or Markdown. When gzipped is true, standard base64 of the gzip-compressed UTF-8 source"`
 	Format      string `json:"format,omitempty" jsonschema:"html (default) or markdown"`
-	Title       string `json:"title,omitempty" jsonschema:"title shown in the browser tab"`
+	Title       string `json:"title,omitempty" jsonschema:"page name, shown in the browser tab and in link previews when the URL is pasted into another app"`
+	Description string `json:"description,omitempty" jsonschema:"one or two sentences shown under the title in link previews"`
 	Team        string `json:"team,omitempty" jsonschema:"name or id of one of the user's teams to create the page in; omit for a personal page"`
 	AgenticOnly *bool  `json:"agentic_only,omitempty" jsonschema:"when true, creates an agent scratchpad (hidden from the web library by default); team is ignored and the page is stored as personal"`
 	Gzipped     *bool  `json:"gzipped,omitempty" jsonschema:"when true, content is standard base64 of gzip-compressed UTF-8 page source. Omit or false for plain HTML or Markdown"`
@@ -192,7 +195,8 @@ type DraftInput struct {
 	Key         string  `json:"key" jsonschema:"write key or write URL"`
 	Content     *string `json:"content,omitempty" jsonschema:"new full page source; replaces the existing content when the draft is published. When gzipped is true, standard base64 of the gzip-compressed UTF-8 source"`
 	Format      *string `json:"format,omitempty" jsonschema:"html or markdown"`
-	Title       *string `json:"title,omitempty" jsonschema:"new title"`
+	Title       *string `json:"title,omitempty" jsonschema:"new title, shown in the browser tab and in link previews"`
+	Description *string `json:"description,omitempty" jsonschema:"new link-preview summary; one or two sentences. Pass an empty string to clear it"`
 	AgenticOnly *bool   `json:"agentic_only,omitempty" jsonschema:"mark or unmark the page as an agent scratchpad when the draft is published"`
 	Gzipped     *bool   `json:"gzipped,omitempty" jsonschema:"when true, content is standard base64 of gzip-compressed UTF-8 page source. Omit or false for plain HTML or Markdown"`
 }
@@ -237,6 +241,7 @@ type DeleteInput struct {
 
 type PageResult struct {
 	Title       string    `json:"title"`
+	Description string    `json:"description"`
 	Format      string    `json:"format"`
 	Content     *string   `json:"content,omitempty"`
 	AgenticOnly bool      `json:"agentic_only"`
@@ -258,7 +263,7 @@ type DeleteResult struct {
 func (t *tools) result(a *store.Access, withContent bool) PageResult {
 	l := links.For(t.base, a.ReadKey, a.WriteKey)
 	r := PageResult{
-		Title: a.Title, Format: a.Format, AgenticOnly: a.AgenticOnly, CanWrite: a.CanWrite,
+		Title: a.Title, Description: a.Description, Format: a.Format, AgenticOnly: a.AgenticOnly, CanWrite: a.CanWrite,
 		ReadURL: l.ReadURL, WriteURL: l.WriteURL, HTMLURL: l.HTMLURL, PDFURL: l.PDFURL, RawURL: l.RawURL,
 		ReadKey: a.ReadKey, WriteKey: a.WriteKey, UpdatedAt: a.UpdatedAt,
 	}
@@ -293,7 +298,7 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 		if terr != nil {
 			return nil, PageResult{}, terr
 		}
-		a, err = t.Store.CreateInTeam(ctx, t.user.ID, team.ID, in.Title, in.Format, content, false)
+		a, err = t.Store.CreateInTeam(ctx, t.user.ID, team.ID, in.Title, in.Format, content, false, in.Description)
 		if err == nil {
 			t.logPage(ctx, a, store.ActivityPageCreated)
 		}
@@ -301,9 +306,9 @@ func (t *tools) create(ctx context.Context, _ *mcp.CallToolRequest, in CreateInp
 		if err := t.checkQuota(ctx); err != nil {
 			return nil, PageResult{}, err
 		}
-		a, err = t.Store.CreateOwned(ctx, t.user.ID, in.Title, in.Format, content, agentic)
+		a, err = t.Store.CreateOwned(ctx, t.user.ID, in.Title, in.Format, content, agentic, in.Description)
 	} else {
-		a, err = t.Store.Create(ctx, in.Title, in.Format, content, agentic)
+		a, err = t.Store.Create(ctx, in.Title, in.Format, content, agentic, in.Description)
 	}
 	if err != nil {
 		return nil, PageResult{}, err
@@ -337,8 +342,8 @@ func (t *tools) createDraft(ctx context.Context, _ *mcp.CallToolRequest, in Draf
 	if err != nil {
 		return nil, DraftResult{}, store.ErrNotFound
 	}
-	if in.Content == nil && in.Format == nil && in.Title == nil && in.AgenticOnly == nil {
-		return nil, DraftResult{}, errors.New("nothing to draft: pass content, title, format or agentic_only")
+	if in.Content == nil && in.Format == nil && in.Title == nil && in.Description == nil && in.AgenticOnly == nil {
+		return nil, DraftResult{}, errors.New("nothing to draft: pass content, title, description, format or agentic_only")
 	}
 	content := in.Content
 	if in.Content != nil {
@@ -350,9 +355,9 @@ func (t *tools) createDraft(ctx context.Context, _ *mcp.CallToolRequest, in Draf
 	}
 	var d *store.Draft
 	if t.user != nil {
-		d, err = t.Store.SaveDraftForUser(ctx, key, t.user.ID, in.Title, in.Format, content, in.AgenticOnly)
+		d, err = t.Store.SaveDraftForUser(ctx, key, t.user.ID, in.Title, in.Description, in.Format, content, in.AgenticOnly)
 	} else {
-		d, err = t.Store.SaveDraft(ctx, key, in.Title, in.Format, content, in.AgenticOnly)
+		d, err = t.Store.SaveDraft(ctx, key, in.Title, in.Description, in.Format, content, in.AgenticOnly)
 	}
 	if err != nil {
 		return nil, DraftResult{}, err

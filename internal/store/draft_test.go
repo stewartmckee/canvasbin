@@ -7,6 +7,35 @@ import (
 	"time"
 )
 
+func TestDescriptionOnCreateAndDraft(t *testing.T) {
+	ctx := context.Background()
+	st := testStore(t)
+	a, err := st.Create(ctx, "Launch", "html", "<p>hi</p>", false, "Notes from the launch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Description != "Notes from the launch" {
+		t.Fatalf("create description: %q", a.Description)
+	}
+	got, err := st.Get(ctx, a.ReadKey)
+	if err != nil || got.Description != "Notes from the launch" {
+		t.Fatalf("stored description: %+v %v", got, err)
+	}
+	next := "Shipped on Monday"
+	body := "<p>hi</p>"
+	d, err := st.SaveDraft(ctx, a.WriteKey, nil, &next, nil, &body, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	published, err := st.PublishDraft(ctx, a.WriteKey, d.ID, len(body), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published.Title != "Launch" || published.Description != "Shipped on Monday" {
+		t.Fatalf("publish: title %q description %q", published.Title, published.Description)
+	}
+}
+
 func TestCheckPublishLength(t *testing.T) {
 	n := func(v int) *int { return &v }
 	live := "0123456789" // 10 bytes
@@ -33,14 +62,14 @@ func TestDraftPublishLengths(t *testing.T) {
 	ctx := context.Background()
 	st := testStore(t)
 	live := "0123456789"
-	a, err := st.Create(ctx, "T", "html", live, false)
+	a, err := st.Create(ctx, "T", "html", live, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	before := a.UpdatedAt
 
 	short := "abc"
-	d, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, &short, nil)
+	d, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, nil, &short, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +86,7 @@ func TestDraftPublishLengths(t *testing.T) {
 
 	// A second draft replaces the first.
 	longer := short + "defghi" // 9 bytes, not under half of 10
-	d2, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, &longer, nil)
+	d2, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, nil, &longer, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +118,7 @@ func TestDraftPublishLengths(t *testing.T) {
 
 	// Under half of the new live page.
 	stub := "no"
-	d3, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, &stub, nil)
+	d3, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, nil, &stub, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,14 +141,14 @@ func TestDraftPublishLengths(t *testing.T) {
 func TestDraftDoesNotMoveUpdatedAt(t *testing.T) {
 	ctx := context.Background()
 	st := testStore(t)
-	a, err := st.Create(ctx, "T", "html", "live page", false)
+	a, err := st.Create(ctx, "T", "html", "live page", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Give the clock a moment so a mistaken updated_at = now() cannot tie.
 	time.Sleep(20 * time.Millisecond)
 	body := "shorter"
-	if _, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, &body, nil); err != nil {
+	if _, err := st.SaveDraft(ctx, a.WriteKey, nil, nil, nil, &body, nil); err != nil {
 		t.Fatal(err)
 	}
 	got, err := st.Get(ctx, a.ReadKey)

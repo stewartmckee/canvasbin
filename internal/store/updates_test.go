@@ -10,7 +10,7 @@ import (
 func TestPageUpdatesFlow(t *testing.T) {
 	ctx := context.Background()
 	st := testStore(t)
-	a, err := st.Create(ctx, "News", "markdown", "# hi", false)
+	a, err := st.Create(ctx, "News", "markdown", "# hi", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestPageUpdatesFlow(t *testing.T) {
 func TestScheduledPageUpdates(t *testing.T) {
 	ctx := context.Background()
 	st := testStore(t)
-	a, err := st.Create(ctx, "News", "markdown", "# hi", false)
+	a, err := st.Create(ctx, "News", "markdown", "# hi", false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
