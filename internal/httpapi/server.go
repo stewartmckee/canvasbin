@@ -788,12 +788,40 @@ func (s *Server) servePageApp(w http.ResponseWriter, r *http.Request, key string
 }
 
 func (s *Server) linkPreview(r *http.Request, a *store.Access) render.LinkPreview {
+	base := links.Base(s.PublicBaseURL, r)
 	return render.LinkPreview{
 		Title:       render.PreviewTitle(a.Title, a.Format, a.Content),
 		Description: render.PreviewDescription(a.Description, a.Content),
-		URL:         links.Base(s.PublicBaseURL, r) + r.URL.Path,
+		URL:         base + r.URL.Path,
+		Image:       base + "/og.png",
 		SiteName:    s.Config.ProductNameOrDefault(),
 	}
+}
+
+// linkPreviewCrawler reports user agents that build a card when a link is pasted.
+// They are allowed to read the page title. Googlebot is not one of them.
+func linkPreviewCrawler(ua string) bool {
+	ua = strings.ToLower(ua)
+	for _, bot := range []string{
+		"whatsapp",
+		"facebookexternalhit",
+		"facebot",
+		"twitterbot",
+		"linkedinbot",
+		"slackbot",
+		"discordbot",
+		"telegrambot",
+		"applebot",
+		"embedly",
+		"pinterest",
+		"redditbot",
+		"skypeuripreview",
+	} {
+		if strings.Contains(ua, bot) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) writeIndex(w http.ResponseWriter, r *http.Request, status int) {
@@ -914,7 +942,9 @@ func (s *Server) commonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Referrer-Policy", "no-referrer")
-		if !s.indexable(r) {
+		// Search engines stay out of unguessable pages. Link-preview crawlers
+		// (WhatsApp uses Facebook's) skip the title when they see noindex.
+		if !s.indexable(r) && !linkPreviewCrawler(r.UserAgent()) {
 			h.Set("X-Robots-Tag", "noindex, nofollow")
 		}
 		h.Set("X-Content-Type-Options", "nosniff")

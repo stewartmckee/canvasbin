@@ -33,6 +33,7 @@ func TestApplyLinkPreviewReplacesShellTags(t *testing.T) {
 <meta property="og:description" content="Share HTML and Markdown pages with a link.">
 <meta property="og:url" content="https://canvasbin.dev/">
 <meta property="og:image" content="https://canvasbin.dev/og.png">
+<meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://canvasbin.dev/">
 <meta name="theme-color" content="#4f46e5">
 </head><body><div id="app"></div></body></html>`
@@ -40,6 +41,7 @@ func TestApplyLinkPreviewReplacesShellTags(t *testing.T) {
 		Title:       "Launch notes",
 		Description: `A <week> of "shipping"`,
 		URL:         "https://canvasbin.dev/abc.html",
+		Image:       "https://canvasbin.dev/og.png",
 		SiteName:    "Canvasbin",
 	})
 	for _, want := range []string{
@@ -48,6 +50,7 @@ func TestApplyLinkPreviewReplacesShellTags(t *testing.T) {
 		`property="og:description" content="A &lt;week&gt; of &#34;shipping&#34;"`,
 		`property="og:url" content="https://canvasbin.dev/abc.html"`,
 		`rel="canonical" href="https://canvasbin.dev/abc.html"`,
+		`property="og:image" content="https://canvasbin.dev/og.png"`,
 		`name="theme-color"`,
 		`<div id="app"></div>`,
 	} {
@@ -59,7 +62,7 @@ func TestApplyLinkPreviewReplacesShellTags(t *testing.T) {
 		"Share HTML and Markdown pages",
 		`content="https://canvasbin.dev/"`,
 		`href="https://canvasbin.dev/"`,
-		"og.png",
+		"noindex",
 		"<title>Canvasbin</title>",
 	} {
 		if strings.Contains(got, gone) {

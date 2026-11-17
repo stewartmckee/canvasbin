@@ -14,6 +14,7 @@ type LinkPreview struct {
 	Title       string
 	Description string
 	URL         string
+	Image       string
 	SiteName    string
 }
 
@@ -97,7 +98,7 @@ func ApplyLinkPreview(doc string, p LinkPreview) string {
 	if site == "" {
 		site = "Canvasbin"
 	}
-	block := previewBlock(title, desc, oneLine(p.URL), site)
+	block := previewBlock(title, desc, oneLine(p.URL), oneLine(p.Image), site)
 
 	open := headOpenRe.FindStringIndex(doc)
 	if open == nil {
@@ -114,7 +115,7 @@ func ApplyLinkPreview(doc string, p LinkPreview) string {
 	return doc[:open[1]] + block + inner + rest[close[0]:]
 }
 
-func previewBlock(title, desc, url, site string) string {
+func previewBlock(title, desc, url, image, site string) string {
 	var b strings.Builder
 	b.WriteString("\n<title>")
 	b.WriteString(html.EscapeString(title))
@@ -134,7 +135,16 @@ func previewBlock(title, desc, url, site string) string {
 		b.WriteString(html.EscapeString(url))
 		b.WriteString("\">\n")
 	}
-	writeMeta(&b, "name", "twitter:card", "summary")
+	card := "summary"
+	if image != "" {
+		// WhatsApp will not show the title or description unless og:image is set.
+		card = "summary_large_image"
+		writeMeta(&b, "property", "og:image", image)
+		writeMeta(&b, "property", "og:image:width", "1200")
+		writeMeta(&b, "property", "og:image:height", "630")
+		writeMeta(&b, "name", "twitter:image", image)
+	}
+	writeMeta(&b, "name", "twitter:card", card)
 	writeMeta(&b, "name", "twitter:title", title)
 	if desc != "" {
 		writeMeta(&b, "name", "twitter:description", desc)
@@ -164,7 +174,7 @@ func dropPreviewMeta(tag string) string {
 	name := strings.ToLower(metaAttr(tag, "name"))
 	prop := strings.ToLower(metaAttr(tag, "property"))
 	switch name {
-	case "description", "twitter:card", "twitter:title", "twitter:description", "twitter:image":
+	case "description", "robots", "twitter:card", "twitter:title", "twitter:description", "twitter:image":
 		return ""
 	}
 	switch prop {
